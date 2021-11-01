@@ -1,11 +1,13 @@
 #ifndef _H_PLAYER
 #define _H_PLAYER
 
+#include "./io.h"
+
 struct player_config {
-  char* file_path;
+  struct io_memory_block song;
 };
 
 void
-player_free_config(struct player_config *config);
+player_free_player_config(struct player_config *config);
 
 #endif
