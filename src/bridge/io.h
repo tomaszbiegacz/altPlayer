@@ -5,8 +5,13 @@
 
 struct io_memory_block {
   size_t size;
-  void *start;
+  void *data;
 };
+
+static inline bool
+io_memory_block_is_empty(const struct io_memory_block *src) {
+  return src->data == NULL;
+}
 
 size_t
 io_get_memory_in_pages(size_t value);

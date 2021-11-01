@@ -102,7 +102,7 @@ copy_file_into_memory_block(
   error_t result_error = copy_file_content_into_memory_block(
     fd,
     read_block_size,
-    result->start,
+    result->data,
     result->size);
 
   if (close(fd) == -1) {
@@ -132,7 +132,7 @@ io_read_file_memory(
 ) {
   assert(file_path != NULL);
   assert(result != NULL);
-  assert(result->start == NULL);
+  assert(io_memory_block_is_empty(result));
 
   size_t file_size;
   size_t read_block_size;
@@ -161,7 +161,7 @@ io_read_file_memory(
       (unsigned long)mem_range);
   }
 
-  result->start = mem_range;
+  result->data = mem_range;
   result->size = file_size;
   return copy_file_into_memory_block(file_path, result, read_block_size);
 }
@@ -170,17 +170,17 @@ void
 io_free_memory_block(struct io_memory_block* result) {
   assert(result != NULL);
 
-  if (result->start != NULL) {
-    if (munmap(result->start, result->size) != 0) {
+  if (!io_memory_block_is_empty(result)) {
+    if (munmap(result->data, result->size) != 0) {
       log_error(
         "Cannot release memory mapping starting at %x due to",
-        (unsigned long)result->start,
+        (unsigned long)result->data,
         strerror(errno));
     } else {
       log_verbose(
         "Released memory mapping starting at %x",
-        (unsigned long)result->start);
-      result->start = NULL;
+        (unsigned long)result->data);
+      result->data = NULL;
       result->size = 0;
     }
   }

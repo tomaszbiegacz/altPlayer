@@ -1,7 +1,7 @@
 # Music player
 
 Dependencies:
-* developed in Visual Studio code under Ubuntu
+* developed in Visual Studio Code under Ubuntu
 * dev tools: GCC, CMake, cpplint
 
 Build it with
@@ -14,7 +14,13 @@ cmake --build build
 
 Brige can be used to start player in server mode to receive commands from the network or select a file to play it via ALSA.
 
-Start with
+Start with playing single WAV file
+```
+./build/altBridge -f ~/Music/test/HotelCalifornia.wav -v --log-output=./build/output.txt
+```
+Verbose diagnostics will be written into the `./build/output.txt`.
+
+See all parameters with
 ```
 ./build/altBridge --help
 ```

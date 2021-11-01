@@ -95,12 +95,12 @@ main(int argc, char **argv) {
       log_info("Playing music from [%s]", config.file_path);
 
       struct io_memory_block buffer = { 0 };
+      struct wav_pcm_stereo_content wav_content = { 0 };
+
       error_result = io_read_file_memory(config.file_path, &buffer);
-      if (error_result == 0) {
-        char str_buffer[100];
-        strncpy(str_buffer, (const char*)buffer.start, buffer.size);
-        log_info(str_buffer);
-      }
+      if (error_result == 0)
+        error_result = validate_wav_pcm_stereo_content(&buffer, &wav_content);
+
       io_free_memory_block(&buffer);
     } else {
       log_info("Starting player server...");

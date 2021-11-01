@@ -2,6 +2,7 @@
 #define _H_PLAYER
 
 #include "./io.h"
+#include "./wav.h"
 
 struct player_config {
   struct io_memory_block song;
