@@ -94,14 +94,16 @@ main(int argc, char **argv) {
     if (config.file_path != NULL) {
       log_info("Playing music from [%s]", config.file_path);
 
-      struct io_memory_block buffer = { 0 };
-      struct wav_pcm_stereo_content wav_content = { 0 };
+      struct io_memory_block pcm_buffer = { 0 };
+      struct wav_pcm_content wav_content = { 0 };
 
-      error_result = io_read_file_memory(config.file_path, &buffer);
+      error_result = io_read_file_memory(config.file_path, &pcm_buffer);
       if (error_result == 0)
-        error_result = validate_wav_pcm_stereo_content(&buffer, &wav_content);
+        error_result = wav_validate_pcm_content(&pcm_buffer, &wav_content);
+      if (error_result == 0)
+        error_result = player_play_wav_pcm(&wav_content);
 
-      io_free_memory_block(&buffer);
+      io_free_memory_block(&pcm_buffer);
     } else {
       log_info("Starting player server...");
     }

@@ -4,11 +4,7 @@
 #include "./io.h"
 #include "./wav.h"
 
-struct player_config {
-  struct io_memory_block song;
-};
-
-void
-player_free_player_config(struct player_config *config);
+int
+player_play_wav_pcm(const struct wav_pcm_content* wav);
 
 #endif

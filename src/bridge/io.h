@@ -13,8 +13,11 @@ io_memory_block_is_empty(const struct io_memory_block *src) {
   return src->data == NULL;
 }
 
-size_t
-io_get_memory_in_pages(size_t value);
+error_t
+io_alloc(
+  size_t size,
+  struct io_memory_block* result
+);
 
 error_t
 io_read_file_memory(

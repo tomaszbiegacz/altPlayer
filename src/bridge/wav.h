@@ -3,16 +3,16 @@
 
 #include "./io.h"
 
-struct wav_pcm_stereo_content {
+struct wav_pcm_content {
+  unsigned int channels_count;
   unsigned int samples_per_sec;
   unsigned short bits_per_sample;
-  size_t data_size;
-  const void* data;
+  struct io_memory_block pcm;
 };
 
 error_t
-validate_wav_pcm_stereo_content(
+wav_validate_pcm_content(
   const struct io_memory_block *content,
-  struct wav_pcm_stereo_content *result);
+  struct wav_pcm_content *result);
 
 #endif

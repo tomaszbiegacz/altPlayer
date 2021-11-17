@@ -82,28 +82,30 @@ validate_wav_header(
 static error_t
 validate_fmt_header(
   const struct wav_fmt_chunk_header *header,
-  struct wav_pcm_stereo_content *result
+  struct wav_pcm_content *result
 ) {
   if (header->fmt_format_type != 1) {
-    log_error("File is not in STEREO PCM WAV format (1).");
-    return EINVAL;
-  }
-  if (header->n_channels != 2) {
-    log_error("File is not in STEREO PCM WAV format (2).");
+    log_error("File is not in PCM WAV format (1).");
     return EINVAL;
   }
 
-  unsigned int samples_per_sec = header->samples_per_sec;
-  unsigned int bits_per_sample = header->bits_per_sample;
-  if (header->avg_bytes_per_sec != samples_per_sec * 2 * bits_per_sample / 8) {
-    log_error("File is not in STEREO PCM WAV format (3).");
+
+  const unsigned int samples_per_sec = header->samples_per_sec;
+  const unsigned int bits_per_sample = header->bits_per_sample;
+  const unsigned int channels_count = header->n_channels;
+
+  const unsigned int exp_avg_bytes_per_sec =
+    samples_per_sec * channels_count * bits_per_sample / 8;
+  if (header->avg_bytes_per_sec != exp_avg_bytes_per_sec) {
+    log_error("File is not in PCM WAV format (3).");
     return EINVAL;
   }
-  if (header->block_align != 2 * bits_per_sample / 8) {
-    log_error("File is not in STEREO PCM WAV format (4).");
+  if (header->block_align != channels_count * bits_per_sample / 8) {
+    log_error("File is not in PCM WAV format (4).");
     return EINVAL;
   }
 
+  result->channels_count = channels_count;
   result->samples_per_sec = samples_per_sec;
   result->bits_per_sample = bits_per_sample;
   return 0;
@@ -112,24 +114,26 @@ validate_fmt_header(
 static error_t
 validate_data_header(
   const struct wav_data_chunk_header *header,
-  struct wav_pcm_stereo_content *result
+  struct wav_pcm_content *result
 ) {
   if (memcmp(header->data_marker, "data", 4) != 0) {
-    log_error("File is not in STEREO PCM WAV format (5).");
+    log_error("File is not in PCM WAV format (5).");
     return EINVAL;
   }
 
-  result->data_size = header->data_size;
-  result->data = (const void*)(
-    (const char*)(header) +
-    sizeof(struct wav_data_chunk_header));
+  result->pcm = (struct io_memory_block) {
+    .size = header->data_size,
+    .data = (void*)(
+      (char*)(header) +
+      sizeof(struct wav_data_chunk_header))
+  };
   return 0;
 }
 
 error_t
-validate_wav_pcm_stereo_content(
+wav_validate_pcm_content(
   const struct io_memory_block *content,
-  struct wav_pcm_stereo_content *result
+  struct wav_pcm_content *result
 ) {
   assert(content != NULL);
   assert(!io_memory_block_is_empty(content));
@@ -153,7 +157,8 @@ validate_wav_pcm_stereo_content(
 
   // all is ok
   log_verbose(
-    "WAV parameters: %d samples/s, %d bitrate",
+    "WAV parameters: channels: %d, %d samples/s, %d bitrate",
+    result->channels_count,
     result->samples_per_sec,
     result->bits_per_sample);
   return 0;

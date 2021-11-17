@@ -115,14 +115,35 @@ copy_file_into_memory_block(
   return result_error;
 }
 
-size_t
-io_get_memory_in_pages(size_t value) {
-  const int page_size = getpagesize();
-  assert(page_size > 0);
-  if (value % page_size == 0)
-    return value;
-  else
-    return (value / page_size + 1) * page_size;
+error_t
+io_alloc(
+  size_t size,
+  struct io_memory_block* result
+) {
+  assert(result != NULL);
+  assert(io_memory_block_is_empty(result));
+
+  void* mem_range = mmap(
+    NULL,
+    size,
+    PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS,
+    0, 0);
+
+  if (mem_range == MAP_FAILED) {
+    log_error(
+      "Failed to allocate memory of size %d",
+      size);
+    return errno;
+  } else {
+    log_verbose(
+      "Allocated memory mapping starting at %x",
+      (unsigned long)mem_range);
+  }
+
+  result->data = mem_range;
+  result->size = size;
+  return 0;
 }
 
 error_t
@@ -131,8 +152,6 @@ io_read_file_memory(
   struct io_memory_block* result
 ) {
   assert(file_path != NULL);
-  assert(result != NULL);
-  assert(io_memory_block_is_empty(result));
 
   size_t file_size;
   size_t read_block_size;
@@ -143,26 +162,10 @@ io_read_file_memory(
   if (result_error != 0)
     return result_error;
 
-  void* mem_range = mmap(
-    NULL,
-    file_size,
-    PROT_READ | PROT_WRITE,
-    MAP_PRIVATE | MAP_ANONYMOUS,
-    0, 0);
+  result_error = io_alloc(file_size, result);
+  if (result_error != 0)
+    return result_error;
 
-  if (mem_range == MAP_FAILED) {
-    log_error(
-      "Failed to allocate memory of size %d",
-      file_size);
-    return errno;
-  } else {
-    log_verbose(
-      "Allocated memory mapping starting at %x",
-      (unsigned long)mem_range);
-  }
-
-  result->data = mem_range;
-  result->size = file_size;
   return copy_file_into_memory_block(file_path, result, read_block_size);
 }
 
