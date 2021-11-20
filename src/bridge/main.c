@@ -4,18 +4,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "./log.h"
-#include "./player.h"
+#include "log.h"
+#include "player.h"
 
 #define ARGP_KEY_PLAYER_FILE 'f'
 #define ARGP_KEY_LOG_VERBOSE 'v'
 #define ARGP_KEY_LOG_OUTPUT 1
+#define ARGP_KEY_LOG_HARDWARE 'h'
+#define ARGP_KEY_LOG_PERIOD_SIZE 'p'
+#define ARGP_KEY_LOG_PERIOD_COUNT 'c'
 
 #define ARGP_GROUP_PLAYER 1
 #define ARGP_GROUP_LOG 2
 
 struct bridge_config {
   char* file_path;
+  char* alsa_hadrware;
+  size_t period_size;
+  size_t period_count;
 };
 
 const char *argp_program_version =
@@ -27,11 +33,34 @@ const char *argp_program_bug_address =
 static error_t
 argp_parser(int key, char *arg, struct argp_state *state);
 
+static error_t
+bridge_config_defaults(struct bridge_config *config) {
+  if (config->alsa_hadrware == NULL) {
+    config->alsa_hadrware = strdup("default");
+    if (config->alsa_hadrware == NULL)
+      return ENOMEM;
+  }
+
+  if (config->period_size == 0) {
+    config->period_size = 64;
+  }
+  config->period_size *= 1024;  // in kB
+
+  if (config->period_count == 0) {
+    config->period_count = 1024;
+  }
+  return 0;
+}
+
 static void
-free_bridge_config(struct bridge_config *config) {
+bridge_config_free(struct bridge_config *config) {
   if (config->file_path != NULL) {
     free(config->file_path);
     config->file_path = NULL;
+  }
+  if (config->alsa_hadrware != NULL) {
+    free(config->alsa_hadrware);
+    config->alsa_hadrware = NULL;
   }
 }
 
@@ -47,6 +76,30 @@ main(int argc, char **argv) {
       .arg = "PATH",
       .flags = 0,
       .doc = "Play file from the given path.",
+      .group = ARGP_GROUP_PLAYER
+    },
+    (struct argp_option) {
+      .name = "hadware",
+      .key = ARGP_KEY_LOG_HARDWARE,
+      .arg = "HW",
+      .flags = 0,
+      .doc = "Alsa hardware name, i.e. 'plughw:CARD=PCH,DEV=0'.",
+      .group = ARGP_GROUP_PLAYER
+    },
+    (struct argp_option) {
+      .name = "period_size",
+      .key = ARGP_KEY_LOG_PERIOD_SIZE,
+      .arg = "SIZE",
+      .flags = 0,
+      .doc = "Alsa period size in kB, default 64.",
+      .group = ARGP_GROUP_PLAYER
+    },
+    (struct argp_option) {
+      .name = "period_count",
+      .key = ARGP_KEY_LOG_PERIOD_COUNT,
+      .arg = "COUNT",
+      .flags = 0,
+      .doc = "Alsa periods count in buffer, default 1024.",
       .group = ARGP_GROUP_PLAYER
     },
     (struct argp_option) {
@@ -88,6 +141,9 @@ main(int argc, char **argv) {
 
   error_t error_result = argp_parse(&argp_spec, argc, argv, 0, NULL, &config);
   if (error_result == 0) {
+    error_result = bridge_config_defaults(&config);
+  }
+  if (error_result == 0) {
     log_verbose("Starting %s", argp_program_version);
     log_full_system_information();
 
@@ -97,13 +153,13 @@ main(int argc, char **argv) {
       struct io_memory_block pcm_buffer = { 0 };
       struct wav_pcm_content wav_content = { 0 };
 
-      error_result = io_read_file_memory(config.file_path, &pcm_buffer);
+      error_result = io_memory_block_read_file(config.file_path, &pcm_buffer);
       if (error_result == 0)
         error_result = wav_validate_pcm_content(&pcm_buffer, &wav_content);
       if (error_result == 0)
         error_result = player_play_wav_pcm(&wav_content);
 
-      io_free_memory_block(&pcm_buffer);
+      io_memory_block_free(&pcm_buffer);
     } else {
       log_info("Starting player server...");
     }
@@ -114,21 +170,40 @@ main(int argc, char **argv) {
     error_result,
     strerror(error_result));
 
-  free_bridge_config(&config);
+  bridge_config_free(&config);
   log_free();
   return error_result == 0 ? 0 : -1;
 }
+
+#define SAVE_ARG_STRDUP(c) c = strdup(arg);\
+  if (c == NULL)\
+    return ENOMEM;
+
+#define SAVE_ARG_UL(c) c = strtoul(arg, NULL, 10);\
+  if (c == 0) {\
+    log_error("Invalid argument: %s", arg);\
+    return EINVAL;\
+  }
 
 static error_t
 argp_parser(int key, char *arg, struct argp_state *state) {
   struct bridge_config* const config = state->input;
   switch (key) {
     case ARGP_KEY_PLAYER_FILE:
-      config->file_path = strdup(arg);
-      if (config->file_path == NULL)
-        return ENOMEM;
-      else
-        return 0;
+      SAVE_ARG_STRDUP(config->file_path);
+      return 0;
+
+    case ARGP_KEY_LOG_HARDWARE:
+      SAVE_ARG_STRDUP(config->alsa_hadrware);
+      return 0;
+
+    case ARGP_KEY_LOG_PERIOD_SIZE:
+      SAVE_ARG_UL(config->period_size);
+      return 0;
+
+    case ARGP_KEY_LOG_PERIOD_COUNT:
+      SAVE_ARG_UL(config->period_count);
+      return 0;
 
     case ARGP_KEY_LOG_VERBOSE:
       log_set_verbose(true);

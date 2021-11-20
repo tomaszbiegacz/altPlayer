@@ -14,5 +14,6 @@ add_executable(
 
 target_link_libraries(
   altBridge
+  shared_c
   ${ALSA_LIBRARY}
 )

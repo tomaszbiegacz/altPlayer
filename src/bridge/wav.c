@@ -2,8 +2,8 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
-#include "./log.h"
-#include "./wav.h"
+#include "log.h"
+#include "wav.h"
 
 /**
  * RIFF WAV file header, see
@@ -36,10 +36,9 @@ struct wav_data_chunk_header {
 
 static error_t
 validate_wav_header(
-  const struct io_memory_block *content,
-  const struct wav_fmt_chunk_header **fmt_header,
-  const struct wav_data_chunk_header **data_header
-) {
+  struct io_memory_block *content,
+  struct wav_fmt_chunk_header **fmt_header,
+  struct wav_data_chunk_header **data_header) {
   const size_t memory_block_min_size =
     sizeof(struct wav_header) +
     sizeof(struct wav_fmt_chunk_header) +
@@ -50,8 +49,7 @@ validate_wav_header(
     return EINVAL;
   }
 
-  const struct wav_header *header = content->data;
-
+  struct wav_header *header = content->data;
   if (memcmp(header->riff_marker, "RIFF", 4) != 0) {
     log_error("File is not in WAV format (1).");
     return EINVAL;
@@ -69,27 +67,22 @@ validate_wav_header(
     return EINVAL;
   }
 
-  *fmt_header = (const struct wav_fmt_chunk_header*) (
-    (const char*)(header) +
-    sizeof(struct wav_header));
-  *data_header = (const struct wav_data_chunk_header*) (
-    (const char*)(header) +
-    sizeof(struct wav_header) +
-    header->fmt_length);
+  char* data = content->data;
+  *fmt_header = (struct wav_fmt_chunk_header*) (
+    data + sizeof(struct wav_header));
+  *data_header = (struct wav_data_chunk_header*) (
+    data + sizeof(struct wav_header) + header->fmt_length);
   return 0;
 }
 
 static error_t
 validate_fmt_header(
-  const struct wav_fmt_chunk_header *header,
-  struct wav_pcm_content *result
-) {
+  struct wav_fmt_chunk_header *header,
+  struct wav_pcm_content *result) {
   if (header->fmt_format_type != 1) {
     log_error("File is not in PCM WAV format (1).");
     return EINVAL;
   }
-
-
   const unsigned int samples_per_sec = header->samples_per_sec;
   const unsigned int bits_per_sample = header->bits_per_sample;
   const unsigned int channels_count = header->n_channels;
@@ -113,35 +106,32 @@ validate_fmt_header(
 
 static error_t
 validate_data_header(
-  const struct wav_data_chunk_header *header,
-  struct wav_pcm_content *result
-) {
+  struct wav_data_chunk_header *header,
+  struct wav_pcm_content *result) {
   if (memcmp(header->data_marker, "data", 4) != 0) {
     log_error("File is not in PCM WAV format (5).");
     return EINVAL;
   }
 
+  char* data = (char*)header + sizeof(struct wav_data_chunk_header);
   result->pcm = (struct io_memory_block) {
     .size = header->data_size,
-    .data = (void*)(
-      (char*)(header) +
-      sizeof(struct wav_data_chunk_header))
+    .data = data
   };
   return 0;
 }
 
 error_t
 wav_validate_pcm_content(
-  const struct io_memory_block *content,
-  struct wav_pcm_content *result
-) {
+  struct io_memory_block *content,
+  struct wav_pcm_content *result) {
   assert(content != NULL);
   assert(!io_memory_block_is_empty(content));
   assert(result != NULL);
 
   error_t error_result;
-  const struct wav_fmt_chunk_header *fmt_header;
-  const struct wav_data_chunk_header *data_header;
+  struct wav_fmt_chunk_header *fmt_header;
+  struct wav_data_chunk_header *data_header;
 
   error_result = validate_wav_header(content, &fmt_header, &data_header);
   if (error_result != 0)

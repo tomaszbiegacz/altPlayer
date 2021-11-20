@@ -1,7 +1,7 @@
 #ifndef _H_WAV
 #define _H_WAV
 
-#include "./io.h"
+#include "io.h"
 
 struct wav_pcm_content {
   unsigned int channels_count;
@@ -12,7 +12,7 @@ struct wav_pcm_content {
 
 error_t
 wav_validate_pcm_content(
-  const struct io_memory_block *content,
+  struct io_memory_block *content,
   struct wav_pcm_content *result);
 
 #endif

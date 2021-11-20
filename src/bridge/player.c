@@ -2,8 +2,8 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "./log.h"
-#include "./player.h"
+#include "log.h"
+#include "player.h"
 
 struct player_settings {
   const char *device_name;
@@ -262,7 +262,7 @@ player_play_wav_pcm(const struct wav_pcm_content* wav) {
 
   snd_pcm_drain(handle);
   snd_pcm_close(handle);
-  io_free_memory_block(&buffer);
+  io_memory_block_free(&buffer);
 
   return err;
 }

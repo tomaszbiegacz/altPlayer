@@ -30,4 +30,6 @@ See all parameters with
 * [GNU C Manual](https://www.gnu.org/software/gnu-c-manual/gnu-c-manual.html)
 * [CMake in Visual Studio Code](https://code.visualstudio.com/docs/cpp/cmake-linux)
 * [GNU C Library](https://www.gnu.org/software/libc/manual/html_node/)
+* [Man pages](https://www.man7.org/linux/man-pages/man2/poll.2.html)
 * [CMake Reference](https://cmake.org/cmake/help/v3.22/index.html)
+* [ALSA](https://www.alsa-project.org/wiki/Main_Page)
