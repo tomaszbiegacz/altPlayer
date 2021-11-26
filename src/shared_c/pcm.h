@@ -32,4 +32,14 @@ pcm_validate_wav_content(
   struct pcm_spec *result,
   struct io_stream_statistics *stats);
 
+enum pcm_format {
+  pcm_format_wav      = 1,
+  pcm_format_flac     = 2,
+};
+
+error_t
+pcm_guess_format(
+  const char *file_name,
+  enum pcm_format *format);
+
 #endif

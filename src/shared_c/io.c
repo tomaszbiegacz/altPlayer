@@ -343,3 +343,13 @@ io_rf_stream_seek_block(
   }
   return error_r;
 }
+
+const char*
+get_filename_ext(const char *file_name) {
+  assert(file_name != NULL);
+  const char *dot = strrchr(file_name, '.');
+  if(!dot || dot == file_name)
+    return "";
+  else
+    return dot + 1;
+}

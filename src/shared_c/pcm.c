@@ -2,7 +2,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
-#include "log.h"
+#include <strings.h>
 #include "pcm.h"
 
 /**
@@ -151,3 +151,24 @@ pcm_validate_wav_content(
   }
   return error_r;
     }
+
+
+error_t
+pcm_guess_format(
+    const char *file_name,
+    enum pcm_format *format) {
+  assert(format != NULL);
+  const char *ext = get_filename_ext(file_name);
+
+  if (strcasecmp(ext, "wav") == 0) {
+    *format = pcm_format_wav;
+    return 0;
+  }
+
+  if (strcasecmp(ext, "flac") == 0) {
+    *format = pcm_format_flac;
+    return 0;
+  }
+
+  return EINVAL;
+}

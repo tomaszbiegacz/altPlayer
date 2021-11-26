@@ -18,3 +18,14 @@ TEST_F(SharedTestFixture, pcm_validate_wav_content_TEST_basic) {
 
   io_rf_stream_free(&stream);
 }
+
+TEST_F(SharedTestFixture, pcm_guess_format_TEST_basic) {
+  enum pcm_format result;
+  EXPECT_EQ(0, pcm_guess_format("/test.wav", &result));
+  EXPECT_EQ(pcm_format_wav, result);
+
+  EXPECT_EQ(0, pcm_guess_format("other.flac", &result));
+  EXPECT_EQ(pcm_format_flac, result);
+
+  EXPECT_NE(0, pcm_guess_format("other.unk", &result));
+}

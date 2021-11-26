@@ -6,8 +6,10 @@
 #include <string.h>
 #include "log.h"
 #include "player.h"
+#include "flac.h"
 
 #define ARGP_KEY_PLAYER_FILE 'f'
+#define ARGP_KEY_PLAYER_FILE_FORMAT 't'
 #define ARGP_KEY_LOG_VERBOSE 'v'
 #define ARGP_KEY_LOG_OUTPUT 1
 #define ARGP_KEY_LOG_HARDWARE 'h'
@@ -23,6 +25,7 @@ struct bridge_config {
   size_t period_size;
   size_t period_count;
   int read_timeout;
+  enum pcm_format pcm_format;
 };
 
 const char *argp_program_version =
@@ -36,25 +39,29 @@ argp_parser(int key, char *arg, struct argp_state *state);
 
 static error_t
 bridge_config_defaults(struct bridge_config *config) {
+  error_t error_r = 0;
   if (config->alsa_hadrware == NULL) {
     config->alsa_hadrware = strdup("default");
     if (config->alsa_hadrware == NULL)
-      return ENOMEM;
+      error_r = ENOMEM;
   }
 
-  if (config->period_size == 0) {
-    config->period_size = 128;
+  if (error_r == 0) {
+    if (config->period_size == 0) {
+      config->period_size = 128;
+    }
+    config->period_size *= 1024;  // in kB
   }
-  config->period_size *= 1024;  // in kB
 
-  if (config->period_count == 0) {
+  if (error_r == 0 && config->period_count == 0) {
     config->period_count = 1024;
   }
 
-  if (config->read_timeout == 0) {
+  if (error_r == 0 && config->read_timeout == 0) {
     config->read_timeout = 100;
   }
-  return 0;
+
+  return error_r;
 }
 
 static void
@@ -69,7 +76,55 @@ bridge_config_free(struct bridge_config *config) {
   }
 }
 
-int
+static error_t
+play_file(struct bridge_config *config) {
+  log_info("Playing music from [%s]", config->file_path);
+
+  struct player_parameters player_params = (struct player_parameters) {
+    .device_name = config->alsa_hadrware,
+    .allow_resampling = 1,
+    .period_size = config->period_size,
+    .periods_per_buffer = config->period_count
+  };
+  struct io_rf_stream file_stream = { 0 };
+  struct pcm_spec stream_spec = { 0 };
+  struct io_stream_statistics stream_stats = { 0 };
+
+  error_t error_r = 0;
+  if (config->pcm_format == 0) {
+    error_r = pcm_guess_format(config->file_path, &config->pcm_format);
+  }
+  if (error_r == 0) {
+    error_r = io_rf_stream_open_file(
+      config->file_path, config->period_size, &file_stream);
+  }
+  if (error_r == 0) {
+    switch (config->pcm_format) {
+      case pcm_format_wav:
+        error_r = pcm_validate_wav_content(
+          &file_stream, config->read_timeout, &stream_spec, &stream_stats);
+        break;
+      case pcm_format_flac:
+        error_r = pcm_validate_flac_content(
+          &file_stream, config->read_timeout, &stream_spec, &stream_stats);
+        break;
+      default:
+        log_error("Unknown format: %d", config->pcm_format);
+        error_r = EINVAL;
+    }
+  }
+  if (error_r == 0) {
+    error_r = player_pcm_play(
+      &player_params,
+      config->read_timeout, &stream_spec, &file_stream, &stream_stats);
+  }
+
+  io_rf_stream_free(&file_stream);
+  log_io_rf_stream_statistics(&stream_stats, "music");
+  return error_r;
+}
+
+error_t
 main(int argc, char **argv) {
   log_start();
   struct bridge_config config = { 0 };
@@ -81,6 +136,14 @@ main(int argc, char **argv) {
       .arg = "PATH",
       .flags = 0,
       .doc = "Play file from the given path.",
+      .group = ARGP_GROUP_PLAYER
+    },
+    (struct argp_option) {
+      .name = "format",
+      .key = ARGP_KEY_PLAYER_FILE_FORMAT,
+      .arg = "FORMAT",
+      .flags = 0,
+      .doc = "File format, i.e. wav, flac.",
       .group = ARGP_GROUP_PLAYER
     },
     (struct argp_option) {
@@ -96,7 +159,7 @@ main(int argc, char **argv) {
       .key = ARGP_KEY_LOG_PERIOD_SIZE,
       .arg = "SIZE",
       .flags = 0,
-      .doc = "Alsa period size in kB, default 64.",
+      .doc = "Alsa period size in kB, default 128.",
       .group = ARGP_GROUP_PLAYER
     },
     (struct argp_option) {
@@ -144,39 +207,16 @@ main(int argc, char **argv) {
     .argp_domain = NULL
   };
 
-  error_t error_result = argp_parse(&argp_spec, argc, argv, 0, NULL, &config);
-  if (error_result == 0) {
-    error_result = bridge_config_defaults(&config);
+  error_t error_r = argp_parse(&argp_spec, argc, argv, 0, NULL, &config);
+  if (error_r == 0) {
+    error_r = bridge_config_defaults(&config);
   }
-  if (error_result == 0) {
+  if (error_r == 0) {
     log_verbose("Starting %s", argp_program_version);
     log_full_system_information();
 
     if (config.file_path != NULL) {
-      log_info("Playing music from [%s]", config.file_path);
-
-      struct player_parameters player_params = (struct player_parameters) {
-        .device_name = config.alsa_hadrware,
-        .allow_resampling = 1,
-        .period_size = config.period_size,
-        .periods_per_buffer = config.period_count
-      };
-      struct io_rf_stream file_stream = { 0 };
-      struct pcm_spec stream_spec = { 0 };
-      struct io_stream_statistics stream_stats = { 0 };
-
-      error_result = io_rf_stream_open_file(
-        config.file_path, config.period_size, &file_stream);
-      if (error_result == 0)
-        error_result = pcm_validate_wav_content(
-          &file_stream, config.read_timeout, &stream_spec, &stream_stats);
-      if (error_result == 0)
-        error_result = player_pcm_play(
-          &player_params,
-          config.read_timeout, &stream_spec, &file_stream, &stream_stats);
-
-      io_rf_stream_free(&file_stream);
-      log_io_rf_stream_statistics(&stream_stats, "music");
+      error_r = play_file(&config);
     } else {
       log_info("Starting player server...");
     }
@@ -184,12 +224,12 @@ main(int argc, char **argv) {
 
   log_verbose(
     "Finished with error %d (%s)",
-    error_result,
-    strerror(error_result));
+    error_r,
+    strerror(error_r));
 
   bridge_config_free(&config);
   log_free();
-  return error_result == 0 ? 0 : -1;
+  return error_r == 0 ? 0 : -1;
 }
 
 #define SAVE_ARG_STRDUP(c) c = strdup(arg);\
@@ -209,6 +249,18 @@ argp_parser(int key, char *arg, struct argp_state *state) {
     case ARGP_KEY_PLAYER_FILE:
       SAVE_ARG_STRDUP(config->file_path);
       return 0;
+
+    case ARGP_KEY_PLAYER_FILE_FORMAT:
+      if (strcasecmp(arg, "wav") == 0) {
+        config->pcm_format = pcm_format_wav;
+        return 0;
+      } else if (strcasecmp(arg, "flac") == 0) {
+        config->pcm_format = pcm_format_flac;
+        return 0;
+      } else {
+        log_error("Unknown file format: %s", arg);
+        return EINVAL;
+      }
 
     case ARGP_KEY_LOG_HARDWARE:
       SAVE_ARG_STRDUP(config->alsa_hadrware);

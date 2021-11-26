@@ -140,4 +140,7 @@ log_io_rf_stream_statistics(
     stats->reading_time.tv_nsec / 1000000);
 }
 
+const char*
+get_filename_ext(const char *file_name);
+
 #endif
