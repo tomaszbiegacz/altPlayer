@@ -1,14 +1,21 @@
-#ifndef _H_PLAYER
-#define _H_PLAYER
+#ifndef PLAYER_H_
+#define PLAYER_H_
 
-#include "./io.h"
-#include "./wav.h"
+#include "pcm.h"
 
-struct player_config {
-  struct io_memory_block song;
+struct player_parameters {
+  char *device_name;
+  bool allow_resampling;
+  size_t period_size;
+  unsigned short periods_per_buffer;
 };
 
-void
-player_free_player_config(struct player_config *config);
+error_t
+player_pcm_play(
+  const struct player_parameters *params,
+  int timeout,
+  const struct pcm_spec *stream_spec,
+  struct io_rf_stream *stream,
+  struct io_stream_statistics *stats);
 
 #endif

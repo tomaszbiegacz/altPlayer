@@ -11,9 +11,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_compile_options(-Wall -Wextra -Werror)
 set(CMAKE_C_CPPLINT "cpplint")
+set(CMAKE_BUILD_TYPE Debug)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}")
 
+#
+# Components
+#
+
+add_subdirectory("src/shared_c")
 add_subdirectory("src/bridge")
+
+#
+# Tests
+#
+
+add_subdirectory("tests/shared_c")
+enable_testing()

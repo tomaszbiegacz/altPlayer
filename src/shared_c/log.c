@@ -8,14 +8,14 @@
 #include <unistd.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
-#include "./log.h"
+#include "log.h"
 
 // session id selected at diagnostics start
 static char _log_session_id[16];
 
 // shared diagnostics configuration
 bool _log_is_verbose = false;
-static FILE* _log_output_st = NULL;
+static FILE *_log_output_st = NULL;
 
 error_t
 log_start() {
@@ -204,4 +204,46 @@ log_full_system_information() {
     log_verbose("Available procesors: %d", get_nprocs());
   }
   log_system_information();
+}
+
+#define _NANOSECONDS_IN_MILISECOND 1000000
+#define _NANOSECONDS_IN_SECOND (_NANOSECONDS_IN_MILISECOND*1000)
+
+unsigned
+log_timer_miliseconds(const struct timespec start) {
+  struct timespec end;
+  assert(clock_gettime(CLOCK_MONOTONIC, &end) == 0);
+  int seconds = end.tv_sec - start.tv_sec;
+  int nanoseconds = end.tv_nsec - start.tv_nsec;
+  int nanoseconds_passed = seconds*_NANOSECONDS_IN_SECOND + nanoseconds;
+  return nanoseconds_passed /_NANOSECONDS_IN_MILISECOND;
+}
+
+struct timespec
+log_timer_stop(const struct timespec start) {
+  struct timespec end;
+  assert(clock_gettime(CLOCK_MONOTONIC, &end) == 0);
+
+  struct timespec result;
+  if (end.tv_nsec < start.tv_nsec) {
+      result.tv_sec = end.tv_sec-start.tv_sec-1;
+      result.tv_nsec = _NANOSECONDS_IN_SECOND+end.tv_nsec-start.tv_nsec;
+  } else {
+      result.tv_sec = end.tv_sec-start.tv_sec;
+      result.tv_nsec = end.tv_nsec-start.tv_nsec;
+  }
+  return result;
+}
+
+void
+log_add_elapsed_time(
+    struct timespec *current_value,
+    const struct timespec start) {
+  struct timespec elapsed = log_timer_stop(start);
+  current_value->tv_nsec += elapsed.tv_nsec;
+  current_value->tv_sec += elapsed.tv_sec;
+  if (current_value->tv_nsec >= _NANOSECONDS_IN_SECOND) {
+    current_value->tv_nsec -= _NANOSECONDS_IN_SECOND;
+    current_value->tv_sec += 1;
+  }
 }

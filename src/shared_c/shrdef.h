@@ -1,5 +1,5 @@
-#ifndef _H_STDDEF
-#define _H_STDDEF
+#ifndef _H_SHRDEF
+#define _H_SHRDEF
 
 #include <stddef.h>
 #include <stdbool.h>
