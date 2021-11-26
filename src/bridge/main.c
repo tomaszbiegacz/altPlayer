@@ -22,6 +22,7 @@ struct bridge_config {
   char* alsa_hadrware;
   size_t period_size;
   size_t period_count;
+  int read_timeout;
 };
 
 const char *argp_program_version =
@@ -42,12 +43,16 @@ bridge_config_defaults(struct bridge_config *config) {
   }
 
   if (config->period_size == 0) {
-    config->period_size = 64;
+    config->period_size = 128;
   }
   config->period_size *= 1024;  // in kB
 
   if (config->period_count == 0) {
     config->period_count = 1024;
+  }
+
+  if (config->read_timeout == 0) {
+    config->read_timeout = 100;
   }
   return 0;
 }
@@ -150,16 +155,28 @@ main(int argc, char **argv) {
     if (config.file_path != NULL) {
       log_info("Playing music from [%s]", config.file_path);
 
-      struct io_memory_block pcm_buffer = { 0 };
-      struct wav_pcm_content wav_content = { 0 };
+      struct player_parameters player_params = (struct player_parameters) {
+        .device_name = config.alsa_hadrware,
+        .allow_resampling = 1,
+        .period_size = config.period_size,
+        .periods_per_buffer = config.period_count
+      };
+      struct io_rf_stream file_stream = { 0 };
+      struct pcm_spec stream_spec = { 0 };
+      struct io_stream_statistics stream_stats = { 0 };
 
-      error_result = io_memory_block_read_file(config.file_path, &pcm_buffer);
+      error_result = io_rf_stream_open_file(
+        config.file_path, config.period_size, &file_stream);
       if (error_result == 0)
-        error_result = wav_validate_pcm_content(&pcm_buffer, &wav_content);
+        error_result = pcm_validate_wav_content(
+          &file_stream, config.read_timeout, &stream_spec, &stream_stats);
       if (error_result == 0)
-        error_result = player_play_wav_pcm(&wav_content);
+        error_result = player_pcm_play(
+          &player_params,
+          config.read_timeout, &stream_spec, &file_stream, &stream_stats);
 
-      io_memory_block_free(&pcm_buffer);
+      io_rf_stream_free(&file_stream);
+      log_io_rf_stream_statistics(&stream_stats, "music");
     } else {
       log_info("Starting player server...");
     }

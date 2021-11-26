@@ -1,0 +1,4 @@
+BasedOnStyle: Google
+IntentWidht: 2
+ColumnLimit: 80
+PointerAlignment: Right

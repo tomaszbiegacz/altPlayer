@@ -25,11 +25,20 @@ See all parameters with
 ./build/altBridge --help
 ```
 
+## Conventions
+
+
+
 ## Reference
 
+Development reference:
 * [GNU C Manual](https://www.gnu.org/software/gnu-c-manual/gnu-c-manual.html)
-* [CMake in Visual Studio Code](https://code.visualstudio.com/docs/cpp/cmake-linux)
+* [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
 * [GNU C Library](https://www.gnu.org/software/libc/manual/html_node/)
 * [Man pages](https://www.man7.org/linux/man-pages/man2/poll.2.html)
 * [CMake Reference](https://cmake.org/cmake/help/v3.22/index.html)
+* [GoogleTest User's Guide](https://google.github.io/googletest/)
 * [ALSA](https://www.alsa-project.org/wiki/Main_Page)
+
+IDE reference:
+* [CMake in Visual Studio Code](https://code.visualstudio.com/docs/cpp/cmake-linux)

@@ -5,119 +5,139 @@
 #include "log.h"
 #include "player.h"
 
-struct player_settings {
-  const char *device_name;
-  bool allow_resampling;
-  unsigned int channels_count;
-  unsigned int stream_rate;
-  unsigned int buffer_time_us;
-  unsigned int period_time_us;
-  snd_pcm_format_t sample_format;
-  snd_pcm_access_t memory_access;
-};
-
-inline static size_t
-frame_physical_width(const struct player_settings* params) {
-  return params->channels_count
-    * snd_pcm_format_physical_width(params->sample_format) / 8;
-}
-
-#define RETURN_ON_SNDERROR(f, e)  err = f;\
-  if (err < 0) {\
-    log_error(e, snd_strerror(err));\
-    return err;\
+#define RETURN_ON_SNDERROR(f, e)  error_r = f;\
+  if (error_r < 0) {\
+    log_error(e, snd_strerror(error_r));\
+    return error_r;\
   }
 
-static int
-set_player_params(
-  snd_pcm_t *handle,
-  const struct player_settings* params,
-  snd_pcm_uframes_t* period_size
+static error_t
+get_pcm_format(
+    const struct pcm_spec *stream_spec,
+    snd_pcm_format_t *format) {
+  switch (stream_spec->bits_per_sample) {
+  case 8:
+    *format = SND_PCM_FORMAT_S8;
+    return 0;
+  case 16:
+    *format = SND_PCM_FORMAT_S16_LE;
+    return 0;
+  case 24:
+    *format = SND_PCM_FORMAT_S24_3LE;
+    return 0;
+  case 32:
+    *format = SND_PCM_FORMAT_S32_LE;
+    return 0;
+  }
+
+  log_error("Unsupported player bitrate: %d", stream_spec->bits_per_sample);
+  return EINVAL;
+}
+
+static error_t
+player_set_params(
+  snd_pcm_t *player_handle,
+  const struct player_parameters *params,
+  const struct pcm_spec *stream_spec,
+  snd_pcm_uframes_t* frames_per_period
 ) {
-    int err;
+    error_t error_r = 0;
     int dir = 0;
     snd_pcm_hw_params_t *hw_params = NULL;
 
+    snd_pcm_format_t pcm_format;
+    error_r = get_pcm_format(stream_spec, &pcm_format);
+    if (error_r != 0) {
+      return error_r;
+    }
+
     snd_pcm_hw_params_alloca(&hw_params);
     RETURN_ON_SNDERROR(
-      snd_pcm_hw_params_any(handle, hw_params),
+      snd_pcm_hw_params_any(player_handle, hw_params),
       "Broken configuration for playback: no configurations available: %s");
 
     log_verbose("Resamplng is %s", params->allow_resampling ? "ON" : "OFF");
     RETURN_ON_SNDERROR(
       snd_pcm_hw_params_set_rate_resample(
-        handle, hw_params, params->allow_resampling ? 1 : 0),
+        player_handle, hw_params, params->allow_resampling ? 1 : 0),
       "Resampling setup failed for playback: %s");
 
     log_verbose(
       "Stream parameters are %uHz, %s, %u channels",
-      params->stream_rate,
-      snd_pcm_format_name(params->sample_format),
-      params->channels_count);
+      stream_spec->samples_per_sec,
+      snd_pcm_format_name(pcm_format),
+      stream_spec->channels_count);
     RETURN_ON_SNDERROR(
-      snd_pcm_hw_params_set_access(handle, hw_params, params->memory_access),
+      snd_pcm_hw_params_set_access(
+        player_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED),
       "Access type not available for playback: %s");
     RETURN_ON_SNDERROR(
-      snd_pcm_hw_params_set_format(handle, hw_params, params->sample_format),
+      snd_pcm_hw_params_set_format(player_handle, hw_params, pcm_format),
       "Sample format not available for playback: %s");
     RETURN_ON_SNDERROR(
-      snd_pcm_hw_params_set_channels(handle, hw_params, params->channels_count),
+      snd_pcm_hw_params_set_channels(
+        player_handle, hw_params, stream_spec->channels_count),
       "Channels count not available for playbacks: %s");
 
-    unsigned int rrate = params->stream_rate;
+    unsigned int samples_per_sec = stream_spec->samples_per_sec;
     RETURN_ON_SNDERROR(
-      snd_pcm_hw_params_set_rate_near(handle, hw_params, &rrate, &dir),
+      snd_pcm_hw_params_set_rate_near(
+        player_handle, hw_params, &samples_per_sec, &dir),
       "Rate not available for playback: %s");
-    if (rrate != params->stream_rate) {
+    if (samples_per_sec != stream_spec->samples_per_sec) {
       log_error(
         "Rate doesn't match (requested %uHz, get %uHz)",
-        params->stream_rate, rrate);
+        stream_spec->samples_per_sec, samples_per_sec);
       return EINVAL;
     }
 
-    snd_pcm_uframes_t buffer_size;
-    unsigned buffer_time = params->buffer_time_us;
-    RETURN_ON_SNDERROR(
-      snd_pcm_hw_params_set_buffer_time_near(
-        handle, hw_params, &buffer_time, &dir),
-      "Unable to set buffer time for playback: %s");
-    RETURN_ON_SNDERROR(
-      snd_pcm_hw_params_get_buffer_size(hw_params, &buffer_size),
-      "Unable to get buffer size for playback: %s");
-    size_t buffer_size_physical = buffer_size * frame_physical_width(params);
-    log_verbose(
-      "Buffer time %d ms (%d frames, %d kB)",
-      buffer_time / 1000,
-      buffer_size,
-      buffer_size_physical / 1024);
-
-    unsigned period_time = params->period_time_us;
+    unsigned int period_time = pcm_buffer_time_us(
+      stream_spec, params->period_size);
     RETURN_ON_SNDERROR(
       snd_pcm_hw_params_set_period_time_near(
-        handle, hw_params, &period_time, &dir),
+        player_handle, hw_params, &period_time, &dir),
       "Unable to set period time for playback: %s");
     RETURN_ON_SNDERROR(
-      snd_pcm_hw_params_get_period_size(hw_params, period_size, &dir),
+      snd_pcm_hw_params_get_period_size(hw_params, frames_per_period, &dir),
       "Unable to get period size for playback: %s");
+    size_t period_size = *frames_per_period * pcm_frame_size(stream_spec);
     log_verbose(
-      "Period time %d ms (%d frames)",
+      "Period time %dms (%d frames, %dkb)",
       period_time / 1000,
-      *period_size);
+      *frames_per_period,
+      period_size / 1024);
+
+    snd_pcm_uframes_t frames_per_buffer;
+    unsigned int buffer_time = pcm_buffer_time_us(
+      stream_spec, period_size * params->periods_per_buffer);
+    RETURN_ON_SNDERROR(
+      snd_pcm_hw_params_set_buffer_time_near(
+        player_handle, hw_params, &buffer_time, &dir),
+      "Unable to set buffer time for playback: %s");
+    RETURN_ON_SNDERROR(
+      snd_pcm_hw_params_get_buffer_size(hw_params, &frames_per_buffer),
+      "Unable to get buffer size for playback: %s");
+    log_verbose(
+      "Buffer time %dms (%d frames, %dkB)",
+      buffer_time / 1000,
+      frames_per_buffer,
+      frames_per_buffer * pcm_frame_size(stream_spec) / 1024);
 
     RETURN_ON_SNDERROR(
-      snd_pcm_hw_params(handle, hw_params),
+      snd_pcm_hw_params(player_handle, hw_params),
       "Unable to set hw params for playback: %s");
 
-    return err;
+    return error_r;
 }
 
-static int
-setup_player(
+static error_t
+player_setup(
+  const struct player_parameters *params,
+  const struct pcm_spec *stream_spec,
   snd_pcm_t **player_handle,
-  const struct player_settings *params,
-  snd_pcm_uframes_t* period_size
+  snd_pcm_uframes_t* frames_per_period
 ) {
-  int err;
+  error_t error_r;
   snd_output_t *output = NULL;
 
   log_verbose("ALSA library version:  %s", SND_LIB_VERSION_STR);
@@ -134,135 +154,105 @@ setup_player(
        0),
     "Playback open error: %s");
 
-  snd_pcm_t* handle = *player_handle;
-  err = set_player_params(handle, params, period_size);
-  if (err == 0 && log_is_verbose()) {
-    snd_pcm_dump(handle, output);
-    log_verbose(
-      "PCM state: %s",
-      snd_pcm_state_name(snd_pcm_state(handle)));
+  error_r = player_set_params(
+    *player_handle, params, stream_spec, frames_per_period);
+  if (error_r == 0 && log_is_verbose()) {
+    snd_pcm_dump(*player_handle, output);
   }
 
-  return err;
+  return error_r;
 }
 
-static int
-get_format_from_signed_bitrate(unsigned int bitrate, snd_pcm_format_t* format) {
-  switch (bitrate) {
-  case 8:
-    *format = SND_PCM_FORMAT_S8;
-    return 0;
-  case 16:
-    *format = SND_PCM_FORMAT_S16_LE;
-    return 0;
-  case 24:
-    *format = SND_PCM_FORMAT_S24_3LE;
-    return 0;
-  case 32:
-    *format = SND_PCM_FORMAT_S32_LE;
-    return 0;
-  }
-
-  log_error("Unsupported player bitrate: %d", bitrate);
-  return EINVAL;
-}
-
-static int
-xrun_recovery(snd_pcm_t *handle, int err) {
+static error_t
+xrun_recovery(snd_pcm_t *player_handle, error_t error_r) {
     log_verbose("stream recovery");
-    if (err == -EPIPE) {
+    if (error_r == -EPIPE) {
         RETURN_ON_SNDERROR(
-          snd_pcm_prepare(handle),
+          snd_pcm_prepare(player_handle),
           "Can't recovery from underrun, prepare failed: %s")
-    } else if (err == -ESTRPIPE) {
-        while ((err = snd_pcm_resume(handle)) == -EAGAIN)
+    } else if (error_r == -ESTRPIPE) {
+        while ((error_r = snd_pcm_resume(player_handle)) == -EAGAIN)
             // wait until suspend flag is released
             sleep(1);
-        if (err < 0) {
+        if (error_r < 0) {
             RETURN_ON_SNDERROR(
-              snd_pcm_prepare(handle),
+              snd_pcm_prepare(player_handle),
               "Can't recovery from suspend, prepare failed: %s")
         }
         return 0;
     }
-    return err;
+    return error_r;
 }
 
-static int
+static error_t
 write_loop(
-  snd_pcm_t *handle,
-  const struct io_memory_block* pcm,
-  size_t frame_width,
-  snd_pcm_uframes_t period_size
-) {
-  const char* ptr = pcm->data;
-  size_t remaining_width = pcm->size;
-  while (remaining_width > 0) {
-    snd_pcm_uframes_t current_period_size = period_size;
-    if (current_period_size * frame_width < remaining_width) {
-      current_period_size = remaining_width / frame_width;
-    }
-    if (current_period_size == 0) {
-      log_error("Last frame is incomplete?");
-      remaining_width = 0;
+    snd_pcm_t *player_handle,
+    int timeout,
+    const struct pcm_spec *stream_spec,
+    struct io_rf_stream *stream,
+    snd_pcm_uframes_t frames_per_period,
+    struct io_stream_statistics *stats) {
+  const size_t frame_size = pcm_frame_size(stream_spec);
+  const size_t full_period_size = frame_size * frames_per_period;
+  error_t error_r = 0;
+  size_t remaining_data_size = stream_spec->data_size;
+  while (error_r == 0 && remaining_data_size > 0) {
+    void *period;
+    size_t period_size = mimum_size_t(remaining_data_size, full_period_size);
+    error_r = io_rf_stream_seek_block(
+      stream, timeout, period_size, &period, stats);
+
+    snd_pcm_uframes_t period_frames = 0;
+    if (error_r == 0) {
+      remaining_data_size -= period_size;
+      period_frames = period_size / frame_size;
+      if (period_frames * frame_size !=  period_size) {
+        log_error("Last frame is incomplete?");
+      }
     }
 
-    while (current_period_size > 0) {
-      int err = snd_pcm_writei(handle, ptr, current_period_size);
-      if (err == -EAGAIN)
-        continue;
-
-      if (err < 0) {
-        int err_recovery = xrun_recovery(handle, err);
-        if (err_recovery < 0) {
-          log_error("Write error: %s", snd_strerror(err));
-          return err;
+    while (error_r == 0 && period_frames > 0) {
+      int write_result = snd_pcm_writei(player_handle, period, period_frames);
+      if (write_result != -EAGAIN)
+      {
+        if (write_result < 0) {
+          error_t err_recovery = xrun_recovery(player_handle, write_result);
+          if (err_recovery < 0) {
+            error_r = write_result;
+            log_error("Write error: %s", snd_strerror(error_r));
+          }
+        } else {
+          period_frames -= write_result;
         }
-      } else {
-        const size_t transfered_width = err * frame_width;
-        ptr += transfered_width;
-        current_period_size -= err;
-        remaining_width -= transfered_width;
       }
     }
   }
-  return 0;
+  return error_r;
 }
 
-int
-player_play_wav_pcm(const struct wav_pcm_content* wav) {
-  int err;
-  snd_pcm_format_t format;
-  snd_pcm_t *handle = NULL;
+error_t
+player_pcm_play(
+    const struct player_parameters *params,
+    int timeout,
+    const struct pcm_spec *stream_spec,
+    struct io_rf_stream *stream,
+    struct io_stream_statistics *stats) {
+  assert(params != NULL);
+  assert(stream_spec != NULL);
+  assert(stream != NULL);
 
-  struct io_memory_block buffer = { 0 };
-  snd_pcm_uframes_t period_size;
-  size_t frame_width;
-
-  err = get_format_from_signed_bitrate(wav->bits_per_sample, &format);
-  if (err == 0) {
-    struct player_settings params = (struct player_settings) {
-      .device_name = "default",
-      .allow_resampling = true,
-      .channels_count = wav->channels_count,
-      .stream_rate = wav->samples_per_sec,
-      .buffer_time_us = 5000000,
-      .period_time_us = 100000,
-      .sample_format = format,
-      .memory_access = SND_PCM_ACCESS_RW_INTERLEAVED
-    };
-    err = setup_player(&handle, &params, &period_size);
-    frame_width = frame_physical_width(&params);
+  snd_pcm_t *player_handle = NULL;
+  snd_pcm_uframes_t frames_per_period;
+  error_t error_r = player_setup(
+    params, stream_spec, &player_handle, &frames_per_period);
+  if (error_r == 0) {
+    error_r = write_loop(
+      player_handle, timeout, stream_spec, stream, frames_per_period, stats);
   }
 
-  err = write_loop(handle, &(wav->pcm), frame_width, period_size);
-  if (err == 0) {
-    log_info("all OK");
+  if (player_handle != NULL) {
+    snd_pcm_drain(player_handle);
+    snd_pcm_close(player_handle);
   }
-
-  snd_pcm_drain(handle);
-  snd_pcm_close(handle);
-  io_memory_block_free(&buffer);
-
-  return err;
+  return error_r;
 }
