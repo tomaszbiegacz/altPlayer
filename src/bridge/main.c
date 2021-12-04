@@ -6,26 +6,29 @@
 #include <string.h>
 #include "log.h"
 #include "player.h"
-#include "flac.h"
-
-#define ARGP_KEY_PLAYER_FILE 'f'
-#define ARGP_KEY_PLAYER_FILE_FORMAT 't'
-#define ARGP_KEY_LOG_VERBOSE 'v'
-#define ARGP_KEY_LOG_OUTPUT 1
-#define ARGP_KEY_LOG_HARDWARE 'h'
-#define ARGP_KEY_LOG_PERIOD_SIZE 'p'
-#define ARGP_KEY_LOG_PERIOD_COUNT 'c'
+// #include "flac.h"
 
 #define ARGP_GROUP_PLAYER 1
-#define ARGP_GROUP_LOG 2
+#define ARGP_KEY_PLAYER_FILE 'f'
+#define ARGP_KEY_PLAYER_BUFFER_SIZE 'b'
+#define ARGP_KEY_PLAYER_FILE_FORMAT 't'
+
+#define ARGP_GROUP_ALSA 2
+#define ARGP_KEY_ALSA_HARDWARE 'h'
+#define ARGP_KEY_ALSA_PERIOD_SIZE 'p'
+#define ARGP_KEY_ALSA_PERIOD_COUNT 'c'
+
+#define ARGP_GROUP_LOG 3
+#define ARGP_KEY_LOG_VERBOSE 'v'
+#define ARGP_KEY_LOG_OUTPUT 1
 
 struct bridge_config {
-  char* file_path;
-  char* alsa_hadrware;
-  size_t period_size;
-  size_t period_count;
-  int read_timeout;
+  char *file_path;
+  size_t io_buffer_size;
   enum pcm_format pcm_format;
+  char *alsa_hadrware;
+  size_t alsa_period_size;
+  unsigned int alsa_periods_per_buffer;
 };
 
 const char *argp_program_version =
@@ -40,25 +43,22 @@ argp_parser(int key, char *arg, struct argp_state *state);
 static error_t
 bridge_config_defaults(struct bridge_config *config) {
   error_t error_r = 0;
-  if (config->alsa_hadrware == NULL) {
-    config->alsa_hadrware = strdup("default");
-    if (config->alsa_hadrware == NULL)
-      error_r = ENOMEM;
+  if (error_r == 0) {
+    if (config->io_buffer_size == 0) {
+      config->io_buffer_size = 16;
+    }
+    config->io_buffer_size *= 1024 * 1024;  // in mB
   }
 
   if (error_r == 0) {
-    if (config->period_size == 0) {
-      config->period_size = 128;
+    if (config->alsa_period_size == 0) {
+      config->alsa_period_size = 16;
     }
-    config->period_size *= 1024;  // in kB
+    config->alsa_period_size *= 1024;  // in kB
   }
 
-  if (error_r == 0 && config->period_count == 0) {
-    config->period_count = 1024;
-  }
-
-  if (error_r == 0 && config->read_timeout == 0) {
-    config->read_timeout = 100;
+  if (error_r == 0 && config->alsa_periods_per_buffer == 0) {
+    config->alsa_periods_per_buffer = 1024;
   }
 
   return error_r;
@@ -80,33 +80,28 @@ static error_t
 play_file(struct bridge_config *config) {
   log_info("Playing music from [%s]", config->file_path);
 
-  struct player_parameters player_params = (struct player_parameters) {
-    .device_name = config->alsa_hadrware,
-    .allow_resampling = 1,
-    .period_size = config->period_size,
-    .periods_per_buffer = config->period_count
-  };
   struct io_rf_stream file_stream = { 0 };
-  struct pcm_spec stream_spec = { 0 };
-  struct io_stream_statistics stream_stats = { 0 };
-
+  struct pcm_decoder *decoder = NULL;
+  struct player *player = NULL;
   error_t error_r = 0;
   if (config->pcm_format == 0) {
     error_r = pcm_guess_format(config->file_path, &config->pcm_format);
   }
   if (error_r == 0) {
+    size_t max_single_read_size = config->alsa_period_size;
     error_r = io_rf_stream_open_file(
-      config->file_path, config->period_size, &file_stream);
+      config->file_path,
+      config->io_buffer_size,
+      max_single_read_size,
+      &file_stream);
   }
   if (error_r == 0) {
     switch (config->pcm_format) {
       case pcm_format_wav:
-        error_r = pcm_validate_wav_content(
-          &file_stream, config->read_timeout, &stream_spec, &stream_stats);
-        break;
-      case pcm_format_flac:
-        error_r = pcm_validate_flac_content(
-          &file_stream, config->read_timeout, &stream_spec, &stream_stats);
+        error_r = pcm_decoder_wav_open(
+          &file_stream,
+          config->alsa_period_size,
+          &decoder);
         break;
       default:
         log_error("Unknown format: %d", config->pcm_format);
@@ -114,13 +109,24 @@ play_file(struct bridge_config *config) {
     }
   }
   if (error_r == 0) {
-    error_r = player_pcm_play(
-      &player_params,
-      config->read_timeout, &stream_spec, &file_stream, &stream_stats);
+    struct player_parameters player_params = (struct player_parameters) {
+      .device_name = config->alsa_hadrware,
+      .disable_resampling = 0,
+      .periods_per_buffer = config->alsa_periods_per_buffer,
+      .reads_per_period = 3,
+    };
+    error_r = player_open(&player_params, decoder, &player);
   }
 
+  if (error_r == 0) {
+    while(error_r == 0 && !player_is_eof(player)) {
+      error_r = player_process_once(player);
+    }
+  }
+
+  player_release(&player);
+  pcm_decoder_decode_release(&decoder);
   io_rf_stream_free(&file_stream);
-  log_io_rf_stream_statistics(&stream_stats, "music");
   return error_r;
 }
 
@@ -139,6 +145,14 @@ main(int argc, char **argv) {
       .group = ARGP_GROUP_PLAYER
     },
     (struct argp_option) {
+      .name = "buffer_size",
+      .key = ARGP_KEY_PLAYER_BUFFER_SIZE,
+      .arg = "SIZE",
+      .flags = 0,
+      .doc = "IO buffer size in MB, default 16.",
+      .group = ARGP_GROUP_ALSA
+    },
+    (struct argp_option) {
       .name = "format",
       .key = ARGP_KEY_PLAYER_FILE_FORMAT,
       .arg = "FORMAT",
@@ -148,23 +162,23 @@ main(int argc, char **argv) {
     },
     (struct argp_option) {
       .name = "hadware",
-      .key = ARGP_KEY_LOG_HARDWARE,
+      .key = ARGP_KEY_ALSA_HARDWARE,
       .arg = "HW",
       .flags = 0,
       .doc = "Alsa hardware name, i.e. 'plughw:CARD=PCH,DEV=0'.",
-      .group = ARGP_GROUP_PLAYER
+      .group = ARGP_GROUP_ALSA
     },
     (struct argp_option) {
       .name = "period_size",
-      .key = ARGP_KEY_LOG_PERIOD_SIZE,
+      .key = ARGP_KEY_ALSA_PERIOD_SIZE,
       .arg = "SIZE",
       .flags = 0,
-      .doc = "Alsa period size in kB, default 128.",
-      .group = ARGP_GROUP_PLAYER
+      .doc = "Alsa period size in kB, default 16.",
+      .group = ARGP_GROUP_ALSA
     },
     (struct argp_option) {
       .name = "period_count",
-      .key = ARGP_KEY_LOG_PERIOD_COUNT,
+      .key = ARGP_KEY_ALSA_PERIOD_COUNT,
       .arg = "COUNT",
       .flags = 0,
       .doc = "Alsa periods count in buffer, default 1024.",
@@ -250,6 +264,10 @@ argp_parser(int key, char *arg, struct argp_state *state) {
       SAVE_ARG_STRDUP(config->file_path);
       return 0;
 
+    case ARGP_KEY_PLAYER_BUFFER_SIZE:
+      SAVE_ARG_UL(config->io_buffer_size);
+      return 0;
+
     case ARGP_KEY_PLAYER_FILE_FORMAT:
       if (strcasecmp(arg, "wav") == 0) {
         config->pcm_format = pcm_format_wav;
@@ -262,16 +280,16 @@ argp_parser(int key, char *arg, struct argp_state *state) {
         return EINVAL;
       }
 
-    case ARGP_KEY_LOG_HARDWARE:
+    case ARGP_KEY_ALSA_HARDWARE:
       SAVE_ARG_STRDUP(config->alsa_hadrware);
       return 0;
 
-    case ARGP_KEY_LOG_PERIOD_SIZE:
-      SAVE_ARG_UL(config->period_size);
+    case ARGP_KEY_ALSA_PERIOD_SIZE:
+      SAVE_ARG_UL(config->alsa_period_size);
       return 0;
 
-    case ARGP_KEY_LOG_PERIOD_COUNT:
-      SAVE_ARG_UL(config->period_count);
+    case ARGP_KEY_ALSA_PERIOD_COUNT:
+      SAVE_ARG_UL(config->alsa_periods_per_buffer);
       return 0;
 
     case ARGP_KEY_LOG_VERBOSE:

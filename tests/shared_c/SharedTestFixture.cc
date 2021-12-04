@@ -6,6 +6,7 @@ extern "C" {
 
 void SharedTestFixture::SetUp() {
   log_start();
+  log_set_verbose(true);
 }
 
 void SharedTestFixture::TearDown() {

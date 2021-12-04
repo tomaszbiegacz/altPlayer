@@ -9,140 +9,104 @@ extern "C" {
 
 char
 getCharacterAt(size_t pos) {
-  return '0' + pos % 7;
+  return 1 + pos % 203;
 }
 
-TEST_F(SharedTestFixture, io_rf_stream_read_full_TEST_once) {
-  const int fileSize = 1024*1024;
-  const char* filePath = "TEST_io_rf_stream_read_full.txt";
-
-  std::ofstream testFile;
-  testFile.open(filePath);
-  for(int i=0; i<fileSize; ++i) {
-    testFile << getCharacterAt(i);
-  }
-  testFile.close();
-
-  EMPTY_STRUCT(io_rf_stream, cursor);
-  EMPTY_STRUCT(io_stream_statistics, stats);
-
-  EXPECT_EQ(0, io_rf_stream_open_file(filePath, fileSize + 1, &cursor));
-  EXPECT_STREQ(filePath, cursor.name);
-  EXPECT_EQ(fileSize + 1, cursor.buffer.size);
-  EXPECT_EQ(0, cursor.used_size);
-  EXPECT_FALSE(io_rf_stream_is_eof(&cursor));
-
-  EXPECT_EQ(0, io_rf_stream_read_full(&cursor, 100, &stats));
-  EXPECT_TRUE(io_rf_stream_is_eof(&cursor));
-  EXPECT_EQ(fileSize, cursor.used_size);
-  for(int i=0; i<fileSize; ++i) {
-    const char* data = (char*)cursor.buffer.data;
-    EXPECT_EQ(getCharacterAt(i), data[i]);
-  }
-
-  log_io_rf_stream_statistics(&stats, "test");
-  io_rf_stream_free(&cursor);
-  EXPECT_EQ(NULL, cursor.name);
-  EXPECT_TRUE(io_memory_block_is_empty(&cursor.buffer));
-  EXPECT_EQ(0, cursor.used_size);
-}
-
-TEST_F(SharedTestFixture, io_rf_stream_read_full_TEST_timeout) {
-  const int fileSize = 1024*1024*4;
-  const char* filePath = "TEST_io_rf_stream_read_full.txt";
-
-  std::ofstream testFile;
-  testFile.open(filePath);
-  for(int i=0; i<fileSize; ++i) {
-    testFile << getCharacterAt(i);
-  }
-  testFile.close();
-
-  EMPTY_STRUCT(io_rf_stream, cursor);
-  EMPTY_STRUCT(io_stream_statistics, stats);
-
-  EXPECT_EQ(0, io_rf_stream_open_file(filePath, fileSize + 1, &cursor));
-  EXPECT_STREQ(filePath, cursor.name);
-  EXPECT_EQ(fileSize + 1, cursor.buffer.size);
-  EXPECT_EQ(0, cursor.used_size);
-  EXPECT_FALSE(io_rf_stream_is_eof(&cursor));
-
-  EXPECT_EQ(0, io_rf_stream_read_full(&cursor, 1, &stats));
-  EXPECT_FALSE(io_rf_stream_is_eof(&cursor));
-
-  log_io_rf_stream_statistics(&stats, "test");
-  io_rf_stream_free(&cursor);
-}
-
-TEST_F(SharedTestFixture, io_rf_stream_read_full_TEST_partial) {
-  const size_t fileSize = 1024;
-  const char* filePath = "TEST_io_rf_stream_read_full.txt";
-  const size_t readSize = 750;
-
+void
+prepareTestFile(const char *filePath, size_t fileSize) {
   std::ofstream testFile;
   testFile.open(filePath);
   for(size_t i=0; i<fileSize; ++i) {
     testFile << getCharacterAt(i);
   }
   testFile.close();
+}
 
-  EMPTY_STRUCT(io_rf_stream, cursor);
-  EMPTY_STRUCT(io_stream_statistics, stats);
+TEST_F(SharedTestFixture, io_buffer_TEST_basic) {
+  EMPTY_STRUCT(io_buffer, buffer);
+  int16_t *val_i;
+  char *val_c;
 
-  EXPECT_EQ(0, io_rf_stream_open_file(filePath, readSize, &cursor));
-  EXPECT_FALSE(io_rf_stream_is_eof(&cursor));
-  EXPECT_EQ(0, io_rf_stream_get_unread_buffer_size(&cursor));
+  EXPECT_EQ(0, io_buffer_alloc(14, &buffer));
+  EXPECT_EQ(14, io_buffer_get_allocated_size(&buffer));
+  EXPECT_EQ(0, io_buffer_get_unread_size(&buffer));
+  EXPECT_TRUE(io_buffer_is_empty(&buffer));
+  EXPECT_FALSE(io_buffer_is_full(&buffer));
+  EXPECT_FALSE(io_buffer_try_read(&buffer, sizeof(int16_t), (void**)&val_i));
+  EXPECT_EQ(0, io_buffer_read_array(&buffer, sizeof(int16_t), (void**)&val_i, 1));
 
-  EXPECT_EQ(0, io_rf_stream_read_full(&cursor, 100, &stats));
-  EXPECT_FALSE(io_rf_stream_is_eof(&cursor));
-  EXPECT_EQ(readSize, io_rf_stream_get_unread_buffer_size(&cursor));
-  for(size_t i=0; i<cursor.used_size; ++i) {
-    const char* data = (char*)cursor.buffer.data;
-    EXPECT_EQ(getCharacterAt(i), data[i]);
-  }
+  const int16_t src_1[] = { 30, 31, 32, 33, 34 };
+  EXPECT_TRUE(io_buffer_try_write(&buffer, sizeof(src_1), src_1));
+  EXPECT_EQ(10, io_buffer_get_unread_size(&buffer));
+  EXPECT_FALSE(io_buffer_is_empty(&buffer));
+  EXPECT_FALSE(io_buffer_is_full(&buffer));
 
-  unsigned partialSeek = readSize / 3;
-  struct io_memory_block b1 = io_rf_stream_seek(&cursor, partialSeek);
-  EXPECT_EQ(partialSeek, b1.size);
-  EXPECT_EQ(partialSeek, cursor.cursor_offset);
-  EXPECT_EQ(readSize-partialSeek, io_rf_stream_get_unread_buffer_size(&cursor));
-  for(size_t i=0; i<partialSeek; ++i) {
-    const char* data = (char*)b1.data;
-    EXPECT_EQ(getCharacterAt(i), data[i]);
-  }
-  size_t check_prefix = partialSeek;
+  EXPECT_TRUE(io_buffer_try_read(&buffer, sizeof(int16_t), (void**)&val_i));
+  EXPECT_EQ(30, *val_i);
+  EXPECT_EQ(8, io_buffer_get_unread_size(&buffer));
 
-  struct io_memory_block b12 = io_rf_stream_seek(&cursor, partialSeek);
-  EXPECT_EQ(partialSeek, b12.size);
-  EXPECT_EQ(2 * partialSeek, cursor.cursor_offset);
-  for(size_t i=0; i<partialSeek; ++i) {
-    const char* data = (char*)b12.data;
-    EXPECT_EQ(getCharacterAt(check_prefix + i), data[i]);
-  }
-  check_prefix += partialSeek;
+  const char *src_2 = "0";
+  EXPECT_TRUE(io_buffer_try_write(&buffer, 1, src_2));
+  EXPECT_EQ(9, io_buffer_get_unread_size(&buffer));
+  EXPECT_EQ(2, io_buffer_read_array(&buffer, sizeof(int16_t), (void**)&val_i, 2));
+  EXPECT_EQ(31, *val_i);
+  EXPECT_EQ(32, *(val_i+1));
 
-  char* buffer;
-  size_t buffer_size = 500;
-  EXPECT_EQ(
-    0,
-    io_rf_stream_seek_block(&cursor, 100, buffer_size, (void**)&buffer, &stats));
-  for(size_t i=0; i<buffer_size; ++i) {
-    EXPECT_EQ(getCharacterAt(check_prefix + i), buffer[i]);
-  }
-  check_prefix += buffer_size;
+  size_t available_count;
+  io_buffer_array_items(&buffer, sizeof(int16_t), (void**)&val_i, &available_count);
+  EXPECT_EQ(2, available_count);
+  EXPECT_EQ(33, *val_i);
+  EXPECT_EQ(34, *(val_i+1));
+  io_buffer_array_seek(&buffer, sizeof(int16_t), available_count);
+  EXPECT_EQ(1, io_buffer_get_unread_size(&buffer));
 
-  EXPECT_EQ(0, io_rf_stream_read_full(&cursor, 100, &stats));
-  EXPECT_TRUE(io_rf_stream_is_eof(&cursor));
-  EXPECT_EQ(
-    fileSize - check_prefix, io_rf_stream_get_unread_buffer_size(&cursor));
+  const char *src_3 = "123456789abcd";
+  EXPECT_TRUE(io_buffer_try_write(&buffer, 13, src_3));
+  EXPECT_TRUE(io_buffer_is_full(&buffer));
+  EXPECT_EQ(14, io_buffer_read_array(&buffer, 1, (void**)&val_c, 100));
+  EXPECT_EQ('0', *val_c);
+  EXPECT_EQ('d', *(val_c + 13));
+  EXPECT_TRUE(io_buffer_is_empty(&buffer));
 
-  struct io_memory_block b2 = io_rf_stream_seek(&cursor, fileSize-check_prefix);
-  EXPECT_EQ(0, io_rf_stream_get_unread_buffer_size(&cursor));
-  for(size_t i=0; i<b2.size; ++i) {
-    const char* data = (char*)b2.data;
-    EXPECT_EQ(getCharacterAt(check_prefix + i), data[i]);
-  }
+  io_buffer_free(&buffer);
+  EXPECT_EQ(NULL, buffer.data);
+  io_buffer_free(&buffer);
+}
 
-  log_io_rf_stream_statistics(&stats, "test");
-  io_rf_stream_free(&cursor);
+TEST_F(SharedTestFixture, io_rf_stream_TEST_basic) {
+  const char *filePath = "io_rf_stream_TEST_basic.txt";
+  prepareTestFile(filePath, 14);
+  char *val_c;
+
+  EMPTY_STRUCT(io_rf_stream, buffer);
+  EXPECT_EQ(0, io_rf_stream_open_file(filePath, 11, 5, &buffer));
+  EXPECT_FALSE(io_rf_stream_is_eof(&buffer));
+  EXPECT_FALSE(io_rf_stream_is_empty(&buffer));
+  EXPECT_EQ(11, io_rf_stream_get_allocated_buffer_size(&buffer));
+  EXPECT_EQ(0, io_rf_stream_get_unread_buffer_size(&buffer));
+
+  EXPECT_EQ(0, io_rf_stream_read_with_poll(&buffer, 0));
+  EXPECT_FALSE(io_rf_stream_is_eof(&buffer));
+  EXPECT_EQ(5, io_rf_stream_get_unread_buffer_size(&buffer));
+
+  EXPECT_EQ(0, io_rf_stream_read(&buffer, 9, (void**)&val_c));
+  EXPECT_EQ(getCharacterAt(0), *val_c);
+  EXPECT_EQ(getCharacterAt(8), *(val_c + 8));
+  EXPECT_EQ(1, io_rf_stream_get_unread_buffer_size(&buffer));
+  EXPECT_EQ(1, io_rf_stream_read_array(&buffer, 1, (void**)&val_c, 1));
+  EXPECT_EQ(getCharacterAt(9), *val_c);
+  EXPECT_EQ(0, io_rf_stream_get_unread_buffer_size(&buffer));
+
+  EXPECT_EQ(0, io_rf_stream_read(&buffer, 4, (void**)&val_c));
+  EXPECT_EQ(getCharacterAt(10), *val_c);
+  EXPECT_EQ(getCharacterAt(13), *(val_c + 3));
+
+  EXPECT_EQ(0, io_rf_stream_get_unread_buffer_size(&buffer));
+  EXPECT_FALSE(io_rf_stream_is_eof(&buffer));
+  EXPECT_FALSE(io_rf_stream_is_empty(&buffer));
+  EXPECT_EQ(0, io_rf_stream_read_with_poll(&buffer, 0));
+  EXPECT_TRUE(io_rf_stream_is_eof(&buffer));
+  EXPECT_TRUE(io_rf_stream_is_empty(&buffer));
+
+  io_rf_stream_free(&buffer);
 }

@@ -1,5 +1,5 @@
-#ifndef LOG_H_
-#define LOG_H_
+#ifndef PLAYER_LOG_H_
+#define PLAYER_LOG_H_
 
 #include <assert.h>
 #include <time.h>
