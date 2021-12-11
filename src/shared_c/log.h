@@ -1,7 +1,7 @@
-#ifndef LOG_H_
-#define LOG_H_
+#ifndef PLAYER_LOG_H_
+#define PLAYER_LOG_H_
 
-#include <time.h>
+#include <assert.h>
 #include "shrdef.h"
 
 extern bool _log_is_verbose;
@@ -70,21 +70,5 @@ log_full_system_information();
  */
 void
 log_system_information();
-
-static inline void
-log_timer_start(struct timespec *start) {
-  assert(clock_gettime(CLOCK_MONOTONIC, start) == 0);
-}
-
-unsigned
-log_timer_miliseconds(const struct timespec start);
-
-struct timespec
-log_timer_stop(const struct timespec start);
-
-void
-log_add_elapsed_time(
-    struct timespec *current_value,
-    const struct timespec start);
 
 #endif

@@ -25,11 +25,14 @@ See all parameters with
 ./build/altBridge --help
 ```
 
-## Conventions
-
-
-
 ## Reference
+
+File format documentation:
+* [Wav](http://tiny.systems/software/soundProgrammer/WavFormatDocs.pdf)
+
+Used libraries:
+* [ALSA](https://www.alsa-project.org/wiki/Main_Page)
+* [libFlac](https://www.xiph.org/flac/)
 
 Development reference:
 * [GNU C Manual](https://www.gnu.org/software/gnu-c-manual/gnu-c-manual.html)
@@ -38,7 +41,6 @@ Development reference:
 * [Man pages](https://www.man7.org/linux/man-pages/man2/poll.2.html)
 * [CMake Reference](https://cmake.org/cmake/help/v3.22/index.html)
 * [GoogleTest User's Guide](https://google.github.io/googletest/)
-* [ALSA](https://www.alsa-project.org/wiki/Main_Page)
 
 IDE reference:
 * [CMake in Visual Studio Code](https://code.visualstudio.com/docs/cpp/cmake-linux)

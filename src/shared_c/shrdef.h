@@ -1,8 +1,10 @@
-#ifndef _H_SHRDEF
-#define _H_SHRDEF
+#ifndef PLAYER_SHRDEF_H_
+#define PLAYER_SHRDEF_H_
 
 #include <stddef.h>
 #include <stdbool.h>
+
+#define UNUSED(x) (void)(x)
 
 /**
  * error_t may or may not be available from errno.h,
@@ -13,13 +15,33 @@
   typedef int error_t;
 #endif
 
+static inline int
+min_int(int a, int b) {
+  return a < b ? a : b;
+}
+
+static inline int
+max_int(int a, int b) {
+  return a > b ? a : b;
+}
+
+static inline unsigned int
+min_uint(unsigned int a, unsigned int b) {
+  return a < b ? a : b;
+}
+
+static inline unsigned int
+max_uint(unsigned int a, unsigned int b) {
+  return a > b ? a : b;
+}
+
 static inline size_t
-mimum_size_t(size_t a, size_t b) {
+min_size_t(size_t a, size_t b) {
   return a < b ? a : b;
 }
 
 static inline size_t
-maximum_size_t(size_t a, size_t b) {
+max_size_t(size_t a, size_t b) {
   return a > b ? a : b;
 }
 
