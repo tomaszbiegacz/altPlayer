@@ -145,7 +145,7 @@ play_file(struct bridge_config *config) {
   }
   if (error_r == 0) {
     struct player_parameters player_params = (struct player_parameters) {
-      .device_name = config->alsa_hadrware,
+      .hardware_id = config->alsa_hadrware,
       .disable_resampling = 0,
       .period_size = config->alsa_period_size,
       .periods_per_buffer = config->alsa_periods_per_buffer,
@@ -161,6 +161,36 @@ play_file(struct bridge_config *config) {
   player_release(&player);
   pcm_decoder_decode_release(&decoder);
   io_rf_stream_free(&file_stream);
+  return error_r;
+}
+
+static error_t
+list_sound_cards() {
+  struct sound_card_info* card_info = NULL;
+  error_t error_r = soundc_get_next_info(&card_info);
+  if (card_info != NULL) {
+    log_info("Available sound cards:");
+    while (error_r == 0 && card_info != NULL) {
+      log_info("");
+      log_info(
+        "Hardware [%s] with driver [%s]",
+        soundc_get_hardware_id(card_info),
+        soundc_get_driver_name(card_info));
+      log_info(
+        "Name: %s",
+        soundc_get_long_name(card_info));
+      log_info(
+        "Mixer: %s",
+        soundc_get_mixer_name(card_info));
+      log_info(
+        "Control components: %s",
+        soundc_get_components(card_info));
+
+      error_r = soundc_get_next_info(&card_info);
+    }
+  }  else {
+    log_info("No valid sound hardware found, please check /proc/asound/cards");
+  }
   return error_r;
 }
 
@@ -246,7 +276,7 @@ main(int argc, char **argv) {
     .args_doc = NULL,
     .doc =
       "\n"
-      "Start player in server mode to receive commands from the network or "
+      "List available sound cards or "
       "select a file to play it via ALSA."
       "\n"
       "\nOptions:",
@@ -266,7 +296,7 @@ main(int argc, char **argv) {
     if (config.file_path != NULL) {
       error_r = play_file(&config);
     } else {
-      log_info("Starting player server...");
+      error_r = list_sound_cards();
     }
   }
 
@@ -315,8 +345,13 @@ argp_parser(int key, char *arg, struct argp_state *state) {
       }
 
     case ARGP_KEY_ALSA_HARDWARE:
-      SAVE_ARG_STRDUP(config->alsa_hadrware);
-      return 0;
+      if (soundc_is_valid_hardware_id(arg)) {
+        SAVE_ARG_STRDUP(config->alsa_hadrware);
+        return 0;
+      } else {
+        log_error("Unknown ALSA hardware: %s", arg);
+        return EINVAL;
+      }
 
     case ARGP_KEY_ALSA_PERIOD_SIZE:
       SAVE_ARG_UL(config->alsa_period_size);
