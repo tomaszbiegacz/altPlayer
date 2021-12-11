@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include "io.h"
 #include "log.h"
+#include "timer.h"
 
 #define LAST_IO_ERROR errno != 0 ? errno : EIO
 
@@ -44,11 +45,11 @@ io_buffer_alloc(
       return errno;
     } else {
       log_verbose(
-        "Allocated memory mapping starting at %x",
+        "Allocated %dkB of memory mapping starting at %x",
+        size / 1024,
         (unsigned long)mem_range);
     }
 
-    log_system_information();
     result->size_allocated = size;
     result->size_used = 0;
     result->start_offset = 0;
@@ -199,7 +200,7 @@ io_buffer_write_from_read(
 
     struct timespec wait_start;
     if (stats != NULL) {
-      log_timer_start(&wait_start);
+      timer_start(&wait_start);
     }
     size_t read_size = min_size_t(
       max_read_size,
@@ -209,7 +210,7 @@ io_buffer_write_from_read(
       io_buffer_data_start_write(dest),
       read_size);
     if (stats != NULL) {
-      log_add_elapsed_time(&stats->reading_time, wait_start);
+      timer_add_elapsed(&stats->reading_time, wait_start);
     }
 
     if (read_count < 0) {
@@ -357,11 +358,11 @@ io_rf_stream_read_with_poll(
 
     struct timespec wait_start;
     if (src->stats != NULL) {
-      log_timer_start(&wait_start);
+      timer_start(&wait_start);
     }
     int ready = poll(&pfd, 1, poll_timeout);
     if (src->stats != NULL) {
-      log_add_elapsed_time(&src->stats->waiting_time, wait_start);
+      timer_add_elapsed(&src->stats->waiting_time, wait_start);
     }
 
     if (ready == -1) {
@@ -399,12 +400,10 @@ io_rf_stream_free(struct io_rf_stream *result) {
 
   if (result->stats != NULL) {
     log_verbose(
-      "Stream %s stats: waiting %d.%03ds, reading %d.%03ds",
+      "Stream %s stats: waiting %dms, reading %dms",
       result->name,
-      result->stats->waiting_time.tv_sec,
-      result->stats->waiting_time.tv_nsec / 1000000,
-      result->stats->reading_time.tv_sec,
-      result->stats->reading_time.tv_nsec / 1000000);
+      timespec_miliseconds(result->stats->waiting_time),
+      timespec_miliseconds(result->stats->reading_time));
 
     free(result->stats);
     result->stats = NULL;

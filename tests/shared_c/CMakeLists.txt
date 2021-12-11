@@ -29,7 +29,8 @@ target_link_libraries(
   shared_c
 )
 
-download_test_asset("https://www2.cs.uic.edu/~i101/SoundFiles/StarWars3.wav" test.wav)
+download_test_asset("https://drive.google.com/uc?id=1fFgR6ndtY0bNkTkLYEPI3AkKjUqbsq98" test.wav)
+download_test_asset("https://drive.google.com/uc?id=1AV6XvUJD8s0bKXLaVHk1La6r1Xn2Qzji" test.flac)
 
 include(GoogleTest)
 gtest_discover_tests(tests_shared_c)

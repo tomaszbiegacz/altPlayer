@@ -27,6 +27,9 @@ See all parameters with
 
 ## Reference
 
+File format documentation:
+* [Wav](http://tiny.systems/software/soundProgrammer/WavFormatDocs.pdf)
+
 Used libraries:
 * [ALSA](https://www.alsa-project.org/wiki/Main_Page)
 * [libFlac](https://www.xiph.org/flac/)

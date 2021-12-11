@@ -7,7 +7,9 @@ struct pcm_spec {
   unsigned short channels_count;
   unsigned int samples_per_sec;
   unsigned short bits_per_sample;
-  size_t data_size;
+  bool is_big_endian;
+  bool is_signed;
+  size_t samples_count;
 };
 
 inline static size_t
@@ -23,6 +25,27 @@ pcm_buffer_time_us(const struct pcm_spec *params, size_t size) {
   return size / pcm_frame_size(params)  // frames in buffer
     * 1000 * 1000                       // resolution in us from s
     / params->samples_per_sec;
+}
+
+struct timespec
+pcm_spec_get_samples_time(const struct pcm_spec *params, size_t samples_count);
+
+struct timespec
+pcm_spec_get_total_time(const struct pcm_spec *params);
+
+inline static void
+pcm_spec_log(const char *block_name, const struct pcm_spec *params) {
+  assert(params != NULL);
+  if (log_is_verbose()) {
+    log_verbose(
+      "%s: PCM channels %d, samples/s %d, bts %d, isBigEndian %d, isSigned %d",
+      block_name,
+      params->channels_count,
+      params->samples_per_sec,
+      params->bits_per_sample,
+      params->is_big_endian,
+      params->is_signed);
+  }
 }
 
 enum pcm_format {
@@ -47,12 +70,19 @@ typedef void (*pcm_decoder_release_f) (struct pcm_decoder **handler);
 
 struct pcm_decoder {
   struct io_rf_stream *src;
-  struct io_buffer dest;
   struct pcm_spec spec;
+  struct io_buffer dest;
+  size_t block_size;
 
   pcm_decoder_decode_once_f decode_once;
   pcm_decoder_release_f release;
 };
+
+static inline struct timespec
+pcm_decoder_get_total_time(const struct pcm_decoder *dec) {
+  assert(dec != NULL);
+  return pcm_spec_get_total_time(&dec->spec);
+}
 
 static inline size_t
 pcm_decoder_frame_size(struct pcm_decoder *dec) {
@@ -70,6 +100,24 @@ static inline bool
 pcm_decoder_is_source_buffer_empty(struct pcm_decoder *dec) {
   assert(dec != NULL);
   return io_rf_stream_is_empty(dec->src);
+}
+
+static inline bool
+pcm_decoder_is_source_buffer_full(struct pcm_decoder *dec) {
+  assert(dec != NULL);
+  return io_rf_stream_is_buffer_full(dec->src);
+}
+
+static inline size_t
+pcm_decoder_get_source_buffer_unread_size(struct pcm_decoder *dec) {
+  assert(dec != NULL);
+  return io_rf_stream_get_unread_buffer_size(dec->src);
+}
+
+static inline bool
+pcm_decoder_is_source_buffer_ready_to_read(struct pcm_decoder *dec) {
+  assert(dec != NULL);
+  return io_rf_stream_get_unread_buffer_size(dec->src) > 0;
 }
 
 static inline error_t
@@ -90,7 +138,13 @@ pcm_decoder_is_output_buffer_empty(struct pcm_decoder *dec) {
 static inline bool
 pcm_decoder_is_output_buffer_full(struct pcm_decoder *dec) {
   assert(dec != NULL);
-  return io_buffer_get_available_size(&dec->dest) < pcm_frame_size(&dec->spec);
+  return io_buffer_get_available_size(&dec->dest) < dec->block_size;
+}
+
+static inline size_t
+pcm_decoder_get_output_buffer_frames_count(struct pcm_decoder *dec) {
+  assert(dec != NULL);
+  return io_buffer_get_unread_size(&dec->dest) / pcm_frame_size(&dec->spec);
 }
 
 static inline error_t
@@ -105,6 +159,10 @@ pcm_decoder_decode_release(struct pcm_decoder **dec) {
   (*dec)->release(dec);
 }
 
+/**
+ * @brief WAV format decoder implementation
+ *
+ */
 error_t
 pcm_decoder_wav_open(
   struct io_rf_stream *src,

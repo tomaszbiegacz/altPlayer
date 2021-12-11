@@ -4,9 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "flac.h"
 #include "log.h"
 #include "player.h"
-// #include "flac.h"
+#include "timer.h"
 
 #define ARGP_GROUP_PLAYER 1
 #define ARGP_KEY_PLAYER_FILE 'f'
@@ -52,13 +53,13 @@ bridge_config_defaults(struct bridge_config *config) {
 
   if (error_r == 0) {
     if (config->alsa_period_size == 0) {
-      config->alsa_period_size = 16;
+      config->alsa_period_size = 128;
     }
     config->alsa_period_size *= 1024;  // in kB
   }
 
   if (error_r == 0 && config->alsa_periods_per_buffer == 0) {
-    config->alsa_periods_per_buffer = 1024;
+    config->alsa_periods_per_buffer = 64;
   }
 
   return error_r;
@@ -74,6 +75,33 @@ bridge_config_free(struct bridge_config *config) {
     free(config->alsa_hadrware);
     config->alsa_hadrware = NULL;
   }
+}
+
+static error_t
+play(struct player *player) {
+  struct player_playback_status status;
+  error_t error_r = 0;
+
+  while (error_r == 0 && !player_is_eof(player)) {
+    error_r = player_process_once(player);
+    if (error_r == 0) {
+        error_r = player_get_playback_status(player, &status);
+    }
+    if (error_r == 0) {
+      fprintf(
+        stdout,
+"Playing %02d:%02d from %02d:%02d (io buffer %ldkb, alsa buffer %dms)       \r",
+        timespec_get_minutes(status.actual),
+        timespec_get_remaining_seconds(status.actual),
+        timespec_get_minutes(status.total),
+        timespec_get_remaining_seconds(status.total),
+        status.stream_buffer / 1024,
+        timespec_miliseconds(status.playback_buffer));
+      fflush(stdout);
+    }
+  }
+  printf("\n");
+  return error_r;
 }
 
 static error_t
@@ -96,11 +124,18 @@ play_file(struct bridge_config *config) {
       &file_stream);
   }
   if (error_r == 0) {
+    size_t pcm_buffer_size = 2 * config->alsa_period_size;
     switch (config->pcm_format) {
       case pcm_format_wav:
         error_r = pcm_decoder_wav_open(
           &file_stream,
-          config->alsa_period_size,
+          pcm_buffer_size,
+          &decoder);
+        break;
+      case pcm_format_flac:
+        error_r = pcm_decoder_flac_open(
+          &file_stream,
+          pcm_buffer_size,
           &decoder);
         break;
       default:
@@ -112,6 +147,7 @@ play_file(struct bridge_config *config) {
     struct player_parameters player_params = (struct player_parameters) {
       .device_name = config->alsa_hadrware,
       .disable_resampling = 0,
+      .period_size = config->alsa_period_size,
       .periods_per_buffer = config->alsa_periods_per_buffer,
       .reads_per_period = 3,
     };
@@ -119,9 +155,7 @@ play_file(struct bridge_config *config) {
   }
 
   if (error_r == 0) {
-    while(error_r == 0 && !player_is_eof(player)) {
-      error_r = player_process_once(player);
-    }
+    error_r = play(player);
   }
 
   player_release(&player);

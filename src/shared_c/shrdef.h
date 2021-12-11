@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#define UNUSED(x) (void)(x)
+
 /**
  * error_t may or may not be available from errno.h,
  * depending on the operating system.
