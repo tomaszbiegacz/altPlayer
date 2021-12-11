@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #define UNUSED(x) (void)(x)
+#define IF_NULL(x, default) x == NULL ? default:x
 
 /**
  * error_t may or may not be available from errno.h,
