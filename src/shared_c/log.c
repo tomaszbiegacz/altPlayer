@@ -157,7 +157,7 @@ log_error(const char *format, ...) {
 }
 
 void
-log_system_information() {
+log_system_load_information() {
   if (log_is_verbose()) {
     const unsigned mb = 1024*1024;
 
@@ -187,7 +187,7 @@ log_system_information() {
 }
 
 void
-log_full_system_information() {
+log_system_information() {
   if (log_is_verbose()) {
     struct utsname uname_result;
     if (uname(&uname_result) != -1) {
@@ -203,5 +203,5 @@ log_full_system_information() {
     log_verbose("OS configured procesors: %d", get_nprocs_conf());
     log_verbose("Available procesors: %d", get_nprocs());
   }
-  log_system_information();
+  log_system_load_information();
 }

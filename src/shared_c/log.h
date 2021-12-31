@@ -1,10 +1,14 @@
 #ifndef PLAYER_LOG_H_
 #define PLAYER_LOG_H_
 
-#include <assert.h>
 #include "shrdef.h"
 
 extern bool _log_is_verbose;
+
+
+//
+// Setup
+//
 
 /**
  * Initializes diagnostics.
@@ -19,6 +23,11 @@ log_start();
 void
 log_free();
 
+
+//
+// Query
+//
+
 /**
  * is verbose diagnostics enabled?
  */
@@ -26,6 +35,11 @@ static inline bool
 log_is_verbose() {
   return _log_is_verbose;
 }
+
+
+//
+// Command
+//
 
 /**
  * enable or disable printing out verbose logs
@@ -62,13 +76,13 @@ log_error(const char *format, ...);
  * write extended system information like OS name, avaiable memory etc
  */
 void
-log_full_system_information();
+log_system_information();
 
 /**
  * if verbose diagnostics is enabled
  * write basic system information like avaiable memory etc
  */
 void
-log_system_information();
+log_system_load_information();
 
 #endif

@@ -1,18 +1,9 @@
 #include "timer.h"
 
-#define _MILISECONDS_IN_SECOND 1000u
-
-#define _NANOSECONDS_IN_MILISECOND 1000000u
-#define _NANOSECONDS_IN_SECOND (_NANOSECONDS_IN_MILISECOND * 1000u)
-
-unsigned
-timespec_miliseconds(const struct timespec span) {
-  return _MILISECONDS_IN_SECOND * span.tv_sec
-    + span.tv_nsec / _NANOSECONDS_IN_MILISECOND;
-}
+#define _NANOSECONDS_IN_SECOND (1000 * 1000 * 1000)
 
 struct timespec
-timespec_elapsed_between(
+timespec_get_elapsed_between(
   const struct timespec start,
   const struct timespec end) {
     struct timespec result;
@@ -27,17 +18,17 @@ timespec_elapsed_between(
   }
 
 struct timespec
-timer_elapsed(const struct timespec start) {
+timer_get_elapsed(const struct timespec start) {
   struct timespec end;
   assert(clock_gettime(CLOCK_MONOTONIC_RAW, &end) == 0);
-  return timespec_elapsed_between(start, end);
+  return timespec_get_elapsed_between(start, end);
 }
 
 void
 timer_add_elapsed(
     struct timespec *current_value,
     const struct timespec start) {
-  struct timespec elapsed = timer_elapsed(start);
+  struct timespec elapsed = timer_get_elapsed(start);
   current_value->tv_nsec += elapsed.tv_nsec;
   current_value->tv_sec += elapsed.tv_sec;
   if (current_value->tv_nsec >= _NANOSECONDS_IN_SECOND) {

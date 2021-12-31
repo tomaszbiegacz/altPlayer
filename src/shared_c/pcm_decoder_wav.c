@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include "pcm.h"
+#include "pcm_decoder_wav.h"
 
 /**
  * RIFF WAV file header, see
@@ -34,42 +34,6 @@ struct wav_data_chunk_header {
   uint32_t data_size;                 // size of the data section
 };
 
-struct timespec
-pcm_spec_get_samples_time(const struct pcm_spec *params, size_t samples_count) {
-  assert(params != NULL);
-  struct timespec result = {0};
-  result.tv_sec = samples_count / params->samples_per_sec;
-  result.tv_nsec = 1000000000l * (
-    samples_count - result.tv_sec * params->samples_per_sec)
-    / params->samples_per_sec;
-  return result;
-}
-
-struct timespec
-pcm_spec_get_total_time(const struct pcm_spec *params) {
-  assert(params != NULL);
-  return pcm_spec_get_samples_time(params, params->samples_count);
-}
-
-error_t
-pcm_guess_format(
-  const char *file_name,
-  enum pcm_format *format) {
-    assert(format != NULL);
-    const char *ext = get_filename_ext(file_name);
-
-    if (strcasecmp(ext, "wav") == 0) {
-      *format = pcm_format_wav;
-      return 0;
-    }
-
-    if (strcasecmp(ext, "flac") == 0) {
-      *format = pcm_format_flac;
-      return 0;
-    }
-
-    return EINVAL;
-  }
 
 static error_t
 validate_wav_header(
@@ -147,7 +111,7 @@ validate_wav_fmt_chunk_header(
 
       result->channels_count = channels_count;
       result->samples_per_sec = samples_per_sec;
-      result->bits_per_sample = bits_per_sample;
+      result->bytes_per_sample = bits_per_sample / 8;
     }
     return error_r;
   }
@@ -166,12 +130,17 @@ validate_wav_data_chunk_header(
       error_r = EINVAL;
     }
     if (error_r == 0) {
-      size_t frame_size = pcm_frame_size(result);
+      size_t frame_size = pcm_spec_get_frame_size(result);
       if (header->data_size % frame_size != 0) {
         log_error("WAV: invalid header (6)");
         error_r = EINVAL;
       } else {
-        result->samples_count = header->data_size / frame_size;
+        if (header->data_size % frame_size != 0) {
+          log_error("WAV: not aligned data size: %d", header->data_size);
+          error_r = EINVAL;
+        } else {
+          result->frames_count = header->data_size / frame_size;
+        }
       }
     }
     return error_r;
@@ -190,7 +159,7 @@ pcm_validate_wav_content(
       error_r = validate_wav_data_chunk_header(stream, result);
     }
     if (error_r == 0) {
-      result->is_signed = result->bits_per_sample > 8;
+      result->is_signed = result->bytes_per_sample > 1;
       pcm_spec_log("WAV", result);
     }
     return error_r;
@@ -202,9 +171,9 @@ struct pcm_decoder_wav {
 
 static error_t
 pcm_decoder_wav_decode_once(struct pcm_decoder *handler) {
-  assert(handler != NULL);
-  assert(io_rf_stream_get_unread_buffer_size(handler->src) > 0);
-  assert(!io_buffer_is_full(&handler->dest));
+  const struct io_buffer* src = pcm_decoder_get_source_buffer(handler);
+  assert(io_buffer_get_unread_size(src) > 0);
+  assert(!pcm_decoder_is_output_buffer_full(handler));
 
   void* data;
   size_t count = io_rf_stream_read_array(
@@ -214,20 +183,17 @@ pcm_decoder_wav_decode_once(struct pcm_decoder *handler) {
 }
 
 static void
-pcm_decoder_wav_release(struct pcm_decoder **handler) {
+pcm_decoder_wav_release(struct pcm_decoder *handler) {
   assert(handler != NULL);
-  struct pcm_decoder_wav *to_release = (struct pcm_decoder_wav*) *handler;
-  if (to_release != NULL) {
-    io_buffer_free(&to_release->base.dest);
-    free(to_release);
-    *handler = NULL;
-  }
+  struct pcm_decoder_wav *to_release = (struct pcm_decoder_wav*) handler;
+
+  io_rf_stream_release(&to_release->base.src);
+  io_buffer_free(&to_release->base.dest);
 }
 
 error_t
 pcm_decoder_wav_open(
   struct io_rf_stream *src,
-  size_t buffer_size,
   struct pcm_decoder **decoder) {
     log_verbose("Setting up PCM decoder for WAV");
     assert(!io_rf_stream_is_empty(src));
@@ -238,19 +204,17 @@ pcm_decoder_wav_open(
       error_r = ENOMEM;
     }
     if (error_r == 0) {
-      error_r = io_buffer_alloc(buffer_size, &result->base.dest);
-    }
-    if (error_r == 0) {
       error_r = pcm_validate_wav_content(src, &result->base.spec);
     }
     if (error_r == 0) {
       result->base.src = src;
-      result->base.block_size = pcm_frame_size(&result->base.spec);
+      result->base.block_size = pcm_spec_get_frame_size(&result->base.spec);
       result->base.decode_once = &pcm_decoder_wav_decode_once;
       result->base.release = &pcm_decoder_wav_release;
       *decoder = (struct pcm_decoder*)result;
-    } else {
-      pcm_decoder_wav_release((struct pcm_decoder**)&result);
+    } else if (result != NULL) {
+      pcm_decoder_wav_release((struct pcm_decoder*)result);
+      free(result);
     }
     return error_r;
   }

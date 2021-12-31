@@ -5,32 +5,50 @@
 #include <time.h>
 #include "shrdef.h"
 
-unsigned
-timespec_miliseconds(const struct timespec span);
 
-struct timespec
-timespec_elapsed_between(
-  const struct timespec start,
-  const struct timespec end);
+//
+// Query
+//
 
 inline static int
-timespec_get_minutes(struct timespec span) {
+timespec_get_minutes(const struct timespec span) {
   return span.tv_sec / 60;
 }
 
 inline static int
-timespec_get_remaining_seconds(struct timespec span) {
+timespec_get_seconds_remaining(const struct timespec span) {
   return span.tv_sec % 60;
 }
+
+inline static int
+timespec_get_miliseconds_remaining(const struct timespec span) {
+  return span.tv_nsec / (1000 * 1000);
+}
+
+inline static long
+timespec_get_miliseconds(const struct timespec span) {
+  return span.tv_sec * 1000
+    + timespec_get_miliseconds_remaining(span);
+}
+
+struct timespec
+timespec_get_elapsed_between(
+  const struct timespec start,
+  const struct timespec end);
+
+struct timespec
+timer_get_elapsed(const struct timespec start);
+
+
+//
+// Command
+//
 
 static inline void
 timer_start(struct timespec *start) {
   assert(start != NULL);
   assert(clock_gettime(CLOCK_MONOTONIC_RAW, start) == 0);
 }
-
-struct timespec
-timer_elapsed(const struct timespec start);
 
 void
 timer_add_elapsed(

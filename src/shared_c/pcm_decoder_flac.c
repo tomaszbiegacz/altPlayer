@@ -2,7 +2,7 @@
 #include <FLAC/stream_decoder.h>
 #include <stdlib.h>
 #include <string.h>
-#include "flac.h"
+#include "pcm_decoder_flac.h"
 
 struct pcm_decoder_flac {
   struct pcm_decoder base;
@@ -22,13 +22,15 @@ metadata_callback(
 
     if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
       const FLAC__StreamMetadata_StreamInfo *info = &metadata->data.stream_info;
-      spec->bits_per_sample = info->bits_per_sample;
+      assert(info->bits_per_sample % 8 == 0);
+      spec->bytes_per_sample = info->bits_per_sample / 8;
       spec->channels_count = info->channels;
       spec->samples_per_sec = info->sample_rate;
-      spec->samples_count = info->total_samples;
+      spec->frames_count = info->total_samples;
       spec->is_big_endian = false;
-      spec->is_signed = spec->bits_per_sample > 8;
-      decoder->base.block_size = info->max_blocksize * pcm_frame_size(spec);
+      spec->is_signed = info->bits_per_sample > 8;
+      decoder->base.block_size =
+        info->max_blocksize * pcm_spec_get_frame_size(spec);
     }
   }
 
@@ -91,38 +93,36 @@ write_callback(
       assert(buffer != NULL);
       assert(client_data != NULL);
       struct pcm_decoder_flac *decoder = (struct pcm_decoder_flac*)client_data;
-      const struct pcm_spec *spec = &decoder->base.spec;
-      struct io_buffer *dest = &decoder->base.dest;
+      const struct pcm_spec *spec = pcm_decoder_get_spec(&decoder->base);
 
       const FLAC__FrameHeader* header_info = &frame->header;
       assert(header_info != NULL);
-      if (header_info->bits_per_sample != spec->bits_per_sample) {
+      if (header_info->bits_per_sample != pcm_spec_get_bits_per_sample(spec)) {
         log_error(
           "FLAC: expected bps %d, got %d",
-          spec->bits_per_sample,
+          pcm_spec_get_bits_per_sample(spec),
           header_info->bits_per_sample);
         return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
       }
-      if (header_info->channels != spec->channels_count) {
+      if (header_info->channels != pcm_spec_get_channels_count(spec)) {
         log_error(
           "FLAC: expected channels count %d, got %d",
-          spec->channels_count,
+          pcm_spec_get_channels_count(spec),
           header_info->channels);
         return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
       }
-      if (header_info->sample_rate != spec->samples_per_sec) {
+      if (header_info->sample_rate != pcm_spec_get_samples_per_sec(spec)) {
         log_error(
           "FLAC: expected sample rate %d, got %d",
-          spec->samples_per_sec,
+          pcm_spec_get_samples_per_sec(spec),
           header_info->sample_rate);
         return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
       }
 
-      size_t sample_size = header_info->bits_per_sample / 8;
       for (uint32_t i = 0; i < header_info->blocksize; i++) {
         for (uint32_t c = 0; c < header_info->channels; c++) {
-          FLAC__int32 sample = buffer[0][i];
-          bool result = io_buffer_try_write(dest, sample_size, &sample);
+          FLAC__int32 sample = buffer[c][i];
+          bool result = pcm_decoder_try_write_sample(&decoder->base, sample);
           if (!result) {
             log_error("FLAC: cannot write samples");
             return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
@@ -188,9 +188,9 @@ pcm_validate_flac_content(struct pcm_decoder_flac *decoder) {
 
 static error_t
 pcm_decoder_flac_decode_once(struct pcm_decoder *handler) {
-  assert(handler != NULL);
-  assert(io_rf_stream_get_unread_buffer_size(handler->src) > 0);
-  assert(!io_buffer_is_full(&handler->dest));
+  const struct io_buffer* src = pcm_decoder_get_source_buffer(handler);
+  assert(io_buffer_get_unread_size(src) > 0);
+  assert(!pcm_decoder_is_output_buffer_full(handler));
 
   struct pcm_decoder_flac *decoder = (struct pcm_decoder_flac*)handler;
   if (!FLAC__stream_decoder_process_single(decoder->flac_decoder)) {
@@ -212,21 +212,18 @@ pcm_decoder_flac_decode_once(struct pcm_decoder *handler) {
 }
 
 static void
-pcm_decoder_flac_release(struct pcm_decoder **handler) {
+pcm_decoder_flac_release(struct pcm_decoder *handler) {
   assert(handler != NULL);
-  struct pcm_decoder_flac *to_release = (struct pcm_decoder_flac*) *handler;
-  if (to_release != NULL) {
-    io_buffer_free(&to_release->base.dest);
-    FLAC__stream_decoder_delete(to_release->flac_decoder);
-    free(to_release);
-    *handler = NULL;
-  }
+  struct pcm_decoder_flac *to_release = (struct pcm_decoder_flac*) handler;
+
+  FLAC__stream_decoder_delete(to_release->flac_decoder);
+  io_rf_stream_release(&to_release->base.src);
+  io_buffer_free(&to_release->base.dest);
 }
 
 error_t
 pcm_decoder_flac_open(
   struct io_rf_stream *src,
-  size_t buffer_size,
   struct pcm_decoder **decoder) {
     log_verbose("Setting up PCM decoder for FLAC");
     assert(!io_rf_stream_is_empty(src));
@@ -242,20 +239,12 @@ pcm_decoder_flac_open(
       error_r = pcm_validate_flac_content(result);
     }
     if (error_r == 0) {
-      if (buffer_size < result->base.block_size) {
-        log_verbose(
-          "FLAC: increasing buffer to %d due to block size",
-          result->base.block_size);
-        buffer_size = result->base.block_size;
-      }
-      error_r = io_buffer_alloc(buffer_size, &result->base.dest);
-    }
-    if (error_r == 0) {
       result->base.decode_once = &pcm_decoder_flac_decode_once;
       result->base.release = &pcm_decoder_flac_release;
       *decoder = (struct pcm_decoder*)result;
-    } else {
-      pcm_decoder_flac_release((struct pcm_decoder**)&result);
+    } else if (result != NULL) {
+      pcm_decoder_flac_release((struct pcm_decoder*)result);
+      free(result);
     }
     return error_r;
   }
