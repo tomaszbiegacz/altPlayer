@@ -1,5 +1,11 @@
 include(FindALSA)
 
+if (${ALSA_FOUND})
+  message (STATUS "Found ALSA: ${ALSA_LIBRARY}")
+else()
+  message (FATAL_ERROR "Alsa library not found, install libasound2-dev")
+endif()
+
 find_path(FLAC_INCLUDE_DIR NAMES FLAC/stream_decoder.h)
 find_library(FLAC_LIBRARY NAMES FLAC)
 if (${FLAC_INCLUDE_DIR} STREQUAL "FLAC_INCLUDE_DIR-NOTFOUND"
@@ -9,12 +15,14 @@ else()
   message (STATUS "Found FLAC: ${FLAC_LIBRARY}")
 endif()
 
-if (NOT ${ALSA_FOUND})
-  message (FATAL_ERROR "Alsa library not found, install libasound2;libasound2-dev")
+find_path(URIPARSER_INCLUDE_DIR NAMES uriparser/Uri.h)
+find_library(URIPARSER_LIBRARY NAMES uriparser)
+if (${URIPARSER_INCLUDE_DIR} STREQUAL "URIPARSER_INCLUDE_DIR-NOTFOUND"
+    OR ${URIPARSER_LIBRARY} STREQUAL "URIPARSER_LIBRARY-NOTFOUND")
+  message (FATAL_ERROR "uriparser library not found, install liburiparser-dev")
+else()
+  message (STATUS "Found uriparser: ${URIPARSER_LIBRARY}")
 endif()
-include_directories(
-  ${ALSA_INCLUDE_DIR}
-)
 
 file(GLOB SOURCES "*.c")
 
@@ -33,6 +41,7 @@ target_include_directories(
 
 target_link_libraries(
   shared_c
-  ${FLAC_LIBRARY}
   ${ALSA_LIBRARY}
+  ${FLAC_LIBRARY}
+  ${URIPARSER_LIBRARY}
 )

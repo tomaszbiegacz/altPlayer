@@ -35,7 +35,7 @@ io_buffer_alloc(
         log_verbose(
           "Allocated %dkB of memory mapping starting at %x",
           size / 1024,
-          (unsigned long)mem_range);
+          (u_int64_t)mem_range);
       }
 
       result->size_allocated = size;
@@ -157,12 +157,12 @@ io_buffer_free(struct io_buffer* result) {
     if (munmap(result->data, result->size_allocated) != 0) {
       log_error(
         "Cannot release memory mapping starting at %x due to",
-        (unsigned long)result->data,
+        (u_int64_t)result->data,
         strerror(errno));
     } else {
       log_verbose(
         "Released memory mapping starting at %x",
-        (unsigned long)result->data);
+        (u_int64_t)result->data);
       result->size_allocated = 0;
       result->size_used = 0;
       result->start_offset = 0;

@@ -1,11 +1,16 @@
 #ifndef PLAYER_SHRDEF_H_
 #define PLAYER_SHRDEF_H_
 
-#include <stddef.h>
+#include <assert.h>
+#include <errno.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define UNUSED(x) (void)(x)
 #define IF_NULL(x, default) x == NULL ? default:x
+
+#define ARRAY_LENGTH(x) (sizeof(x) / sizeof(x[0]))
 
 /**
  * error_t may or may not be available from errno.h,

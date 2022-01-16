@@ -11,17 +11,23 @@ extern bool _log_is_verbose;
 //
 
 /**
- * Initializes diagnostics.
+ * Enable or disable printing out verbose logs.
+ */
+void
+log_set_verbose(bool value);
+
+/**
+ * Append logs to additional output file stream.
  */
 error_t
-log_start();
+log_append_to_file(const char *path);
 
 /**
  * Free resources allocated by diagnostics module.
  * Should be called when program ends.
  */
 void
-log_free();
+log_global_release();
 
 
 //
@@ -42,19 +48,7 @@ log_is_verbose() {
 //
 
 /**
- * enable or disable printing out verbose logs
- */
-void
-log_set_verbose(bool value);
-
-/**
- * append logs to additional output file stream
- */
-error_t
-log_open_output_st(const char *path);
-
-/**
- * always print to stdout
+ * always prints to stdout
  */
 void
 log_info(const char *format, ...);
@@ -66,7 +60,7 @@ void
 log_verbose(const char *format, ...);
 
 /**
- * always print to stderr
+ * always prints to stderr
  */
 void
 log_error(const char *format, ...);

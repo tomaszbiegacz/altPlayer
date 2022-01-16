@@ -10,23 +10,17 @@
 #include <sys/utsname.h>
 #include "log.h"
 
+// shared diagnostics configuration
+bool _log_is_verbose = false;
+
+// append file stream
+static FILE *_log_output_st = NULL;
+
 // session id selected at diagnostics start
 static char _log_session_id[16];
 
-// shared diagnostics configuration
-bool _log_is_verbose = false;
-static FILE *_log_output_st = NULL;
-
-error_t
-log_start() {
-  unsigned int rand_seed;
-  snprintf(_log_session_id, sizeof(_log_session_id), "%x", rand_r(&rand_seed));
-
-  return 0;
-}
-
 void
-log_free() {
+log_global_release() {
   if (_log_output_st != NULL) {
     error_t result = fclose(_log_output_st);
     if (result != 0) {
@@ -43,25 +37,30 @@ log_set_verbose(bool value) {
 }
 
 error_t
-log_open_output_st(const char *path) {
+log_append_to_file(const char *path) {
   assert(path != NULL);
   assert(_log_output_st == NULL);
 
+  unsigned int rand_seed;
+  snprintf(_log_session_id, sizeof(_log_session_id), "%x", rand_r(&rand_seed));
+
+  error_t error_r = 0;
   _log_output_st = fopen(path, "a");
+
   if (_log_output_st == NULL) {
+    error_r = errno;
     // ignore failure
     fprintf(
       stderr,
       "Error when opening log output [%s]: %s\n",
       path,
-      strerror(errno));
+      strerror(error_r));
   }
-
-  return 0;
+  return error_r;
 }
 
 static void
-print_line_beginning(FILE* st) {
+log_append_line_beginning(FILE *st) {
   time_t now;
   struct tm local_now;
 
@@ -82,7 +81,7 @@ print_line_beginning(FILE* st) {
     }
   }
 
-  // there is some issue with date&time formatting
+  // it seems that there is some issue with date&time formatting
   // ignore failure
   fputs("[", st);
   fputs(_log_session_id, st);
@@ -90,8 +89,8 @@ print_line_beginning(FILE* st) {
 }
 
 static void
-print_st(FILE* st, const char *format, va_list args) {
-  print_line_beginning(st);
+log_append(FILE* st, const char *format, va_list args) {
+  log_append_line_beginning(st);
   error_t result = vfprintf(st, format, args);
   if (result < 0) {
     // ignore failure
@@ -111,7 +110,7 @@ log_verbose(const char *format, ...) {
     va_start(args, format);
 
     if (_log_output_st != NULL) {
-      print_st(_log_output_st, format, args);
+      log_append(_log_output_st, format, args);
     } else {
       // ignore failure to stdout
       vprintf(format, args);
@@ -134,7 +133,7 @@ log_info(const char *format, ...) {
 
   if (_log_output_st != NULL) {
     va_start(args, format);
-    print_st(_log_output_st, format, args);
+    log_append(_log_output_st, format, args);
     va_end(args);
   }
 }
@@ -151,7 +150,7 @@ log_error(const char *format, ...) {
 
   if (_log_output_st != NULL) {
     va_start(args, format);
-    print_st(_log_output_st, format, args);
+    log_append(_log_output_st, format, args);
     va_end(args);
   }
 }

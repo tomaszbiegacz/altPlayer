@@ -55,8 +55,7 @@ bridge_config_free(struct bridge_config *config) {
 }
 
 error_t
-main(int argc, char **argv) {
-  log_start();
+main10(int argc, char **argv) {
   struct bridge_config config = { 0 };
 
   const struct argp_option argp_options[] = {
@@ -158,7 +157,7 @@ main(int argc, char **argv) {
     strerror(error_r));
 
   bridge_config_free(&config);
-  log_free();
+  log_global_release();
   return error_r == 0 ? 0 : -1;
 }
 
@@ -214,7 +213,7 @@ argp_parser(int key, char *arg, struct argp_state *state) {
       return 0;
 
     case ARGP_KEY_LOG_OUTPUT:
-      return log_open_output_st(arg);
+      return log_append_to_file(arg);
 
     case ARGP_KEY_ARG:
       return ARGP_ERR_UNKNOWN;
