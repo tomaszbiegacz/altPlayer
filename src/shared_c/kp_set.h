@@ -1,6 +1,4 @@
-#ifndef PLAYER_KP_SET_H_
-#define PLAYER_KP_SET_H_
-
+#pragma once
 #include "shrdef.h"
 
 /**
@@ -44,5 +42,3 @@ kp_set_upsert(
 
 void
 kp_set_remove(struct kp_set *source, int64_t key);
-
-#endif

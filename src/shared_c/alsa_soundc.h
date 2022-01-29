@@ -1,6 +1,4 @@
-#ifndef PLAYER_ALSA_SOUNDC_H_
-#define PLAYER_ALSA_SOUNDC_H_
-
+#pragma once
 #include "shrdef.h"
 
 struct sound_card_info;
@@ -38,5 +36,3 @@ alsa_soundc_get_mixer_name(const struct sound_card_info *info);
 
 const char*
 alsa_soundc_get_components(const struct sound_card_info *info);
-
-#endif

@@ -33,7 +33,7 @@ File format documentation:
 Used libraries:
 * [ALSA](https://www.alsa-project.org/wiki/Main_Page), see [api](https://www.alsa-project.org/alsa-doc/alsa-lib/)
 * [libFlac](https://www.xiph.org/flac/), see [api](https://www.xiph.org/flac/api/index.html)
-* [libevent](https://libevent.org/), see [api](https://libevent.org/doc/)
+* [libevent](https://libevent.org/), see [api](https://libevent.org/doc/) and [libevent-book](http://www.wangafu.net/~nickm/libevent-book/)
 * [Nghttp2](http://nghttp2.org/), see [api](http://nghttp2.org/documentation/apiref.html)
 * [OpenSSL](https://www.openssl.org/), see [api](https://www.openssl.org/docs/manmaster/man3/)
 * [uriparser](https://uriparser.github.io/), see [api](https://uriparser.github.io/doc/api/latest/)

@@ -1,6 +1,4 @@
-#ifndef PLAYER_NV_SET_H_
-#define PLAYER_NV_SET_H_
-
+#pragma once
 #include "shrdef.h"
 
 /**
@@ -51,5 +49,3 @@ nv_set_remove(struct nv_set *source, const char *name);
 
 void
 log_verbose_nv_set_content(const struct nv_set *source);
-
-#endif

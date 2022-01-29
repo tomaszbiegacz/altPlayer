@@ -4,6 +4,7 @@
 #include <netinet/tcp.h>
 #include <nghttp2/nghttp2.h>
 #include <sys/socket.h>
+#include "event_dns.h"
 #include "http2_connection.h"
 #include "http2_stream.h"
 #include "kp_set.h"
@@ -254,11 +255,6 @@ http2_on_frame_recv(
 
     if (error_r == 0) {
       switch (frame->hd.type) {
-        case NGHTTP2_DATA:
-          log_verbose(
-            "HTTP2: Receiving data completed for stream %d",
-            http2_stream_get_id(stream));
-          break;
         case NGHTTP2_HEADERS:
           if (frame->headers.cat == NGHTTP2_HCAT_RESPONSE) {
             if (log_is_verbose()) {
@@ -273,6 +269,29 @@ http2_on_frame_recv(
               "HTTP2: unknown header type %d in callback %s",
               frame->headers.cat, callback_name);
           }
+          break;
+        case NGHTTP2_DATA:
+          log_verbose(
+            "HTTP2: Receiving data completed for stream %d",
+            http2_stream_get_id(stream));
+          break;
+        case NGHTTP2_PRIORITY:
+        case NGHTTP2_SETTINGS:
+        case NGHTTP2_PING:
+        case NGHTTP2_GOAWAY:
+        case NGHTTP2_WINDOW_UPDATE:
+        case NGHTTP2_CONTINUATION:
+        case NGHTTP2_ALTSVC:
+        case NGHTTP2_ORIGIN:
+          log_error(
+            "HTTP2: Client received frame of type %d",
+            frame->hd.type);
+          break;
+        case NGHTTP2_RST_STREAM:
+        case NGHTTP2_PUSH_PROMISE:
+          log_error(
+            "HTTP2: Client should not receive frame of type %d",
+            frame->hd.type);
           break;
         default:
           log_error(
@@ -626,7 +645,7 @@ http2event_on_read(
 
     struct evbuffer *input = bufferevent_get_input(event_buffer);
     size_t datalen = evbuffer_get_length(input);
-    unsigned char *data = evbuffer_pullup(input, -1);
+    unsigned char *data = evbuffer_pullup(input, datalen);
 
     ssize_t readlen = nghttp2_session_mem_recv(
       conn->http_session, data, datalen);

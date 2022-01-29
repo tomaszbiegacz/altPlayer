@@ -1,6 +1,4 @@
-#ifndef PLAYER_HTTP2_REQUEST_H_
-#define PLAYER_HTTP2_REQUEST_H_
-
+#pragma once
 #include "uri.h"
 
 /**
@@ -33,5 +31,3 @@ http2_request_get_headers(const struct http2_request *req);
 
 void
 log_verbose_request(const struct http2_request *req);
-
-#endif

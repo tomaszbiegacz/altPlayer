@@ -1,7 +1,4 @@
-#ifndef PLAYER_PCM_SPEC_H_
-#define PLAYER_PCM_SPEC_H_
-
-#include <assert.h>
+#pragma once
 #include <time.h>
 #include "log.h"
 
@@ -102,5 +99,3 @@ pcm_spec_log(const char *block_name, const struct pcm_spec *params) {
       pcm_spec_get_frames_count(params));
   }
 }
-
-#endif

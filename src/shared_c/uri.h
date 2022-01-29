@@ -1,6 +1,4 @@
-#ifndef PLAYER_URI_H_
-#define PLAYER_URI_H_
-
+#pragma once
 #include "shrdef.h"
 
 struct uri_authority {
@@ -89,5 +87,3 @@ error_t
 uri_authority_copy(
   const struct uri_authority *uri,
   struct uri_authority **result_r);
-
-#endif

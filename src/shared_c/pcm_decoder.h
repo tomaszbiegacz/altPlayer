@@ -1,7 +1,4 @@
-#ifndef PLAYER_PCM_DECODER_H_
-#define PLAYER_PCM_DECODER_H_
-
-#include <stdlib.h>
+#pragma once
 #include "io_rf_stream.h"
 #include "pcm_spec.h"
 
@@ -115,5 +112,3 @@ pcm_decoder_try_write_sample(struct pcm_decoder *dec, int32_t sample) {
     pcm_spec_get_bytes_per_sample(&dec->spec),
     &sample);
 }
-
-#endif

@@ -1,7 +1,4 @@
-#ifndef PLAYER_IO_BUFFER_H_
-#define PLAYER_IO_BUFFER_H_
-
-#include <assert.h>
+#pragma once
 #include <time.h>
 #include "shrdef.h"
 
@@ -114,5 +111,3 @@ io_buffer_write_from_read(
   bool *is_eof,
   struct io_stream_statistics *stats);
 
-
-#endif

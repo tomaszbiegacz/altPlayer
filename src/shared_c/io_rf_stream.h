@@ -1,6 +1,4 @@
-#ifndef PLAYER_IO_RF_STREAM_H_
-#define PLAYER_IO_RF_STREAM_H_
-
+#pragma once
 #include "io_buffer.h"
 
 /**
@@ -89,5 +87,3 @@ io_rf_stream_read_array(
     assert(src != NULL);
     return io_buffer_read_array(&src->buffer, item_size, dest, max_count);
   }
-
-#endif

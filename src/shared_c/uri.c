@@ -1,5 +1,3 @@
-#include <assert.h>
-#include <errno.h>
 #include <uriparser/Uri.h>
 #include "uri.h"
 #include "log.h"

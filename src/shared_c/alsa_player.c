@@ -1,6 +1,4 @@
 #include <alsa/asoundlib.h>
-#include <assert.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include "log.h"
 #include "alsa_player.h"
@@ -141,7 +139,7 @@ alsa_player_release(struct alsa_player **player_ref) {
 
 static error_t
 get_pcm_format(const struct pcm_spec *spec, snd_pcm_format_t *format) {
-  unsigned short bites_per_sample = pcm_spec_get_bits_per_sample(spec);
+  u_int16_t bites_per_sample = pcm_spec_get_bits_per_sample(spec);
   bool is_signed = pcm_spec_is_signed(spec);
   bool is_big_endian = pcm_spec_is_big_endian(spec);
 

@@ -1,7 +1,4 @@
-#ifndef PLAYER_TIME_H_
-#define PLAYER_TIME_H_
-
-#include <assert.h>
+#pragma once
 #include <time.h>
 #include "shrdef.h"
 
@@ -54,5 +51,3 @@ void
 timer_add_elapsed(
     struct timespec *current_value,
     const struct timespec start);
-
-#endif

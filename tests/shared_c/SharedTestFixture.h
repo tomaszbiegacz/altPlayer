@@ -1,10 +1,17 @@
+#pragma once
 #include <gtest/gtest.h>
 
-class SharedTestFixture: public ::testing::Test {
-public:
-  void SetUp();
-  void TearDown();
-};
+extern "C" {
+  #include "log.h"
+}
 
-#define EMPTY_STRUCT(t, n) struct t n;\
-  memset(&n, 0, sizeof(n))
+class cSharedTestFixture: public ::testing::Test {
+public:
+  void SetUp() {
+    log_set_verbose(true);
+  }
+
+  void TearDown() {
+    log_global_release();
+  }
+};

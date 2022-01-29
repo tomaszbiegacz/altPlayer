@@ -1,6 +1,4 @@
-#ifndef PLAYER_ALSA_PLAYER_H_
-#define PLAYER_ALSA_PLAYER_H_
-
+#pragma once
 #include "pcm_decoder.h"
 
 /**
@@ -73,5 +71,3 @@ error_t
 alsa_player_process_once(
   struct alsa_player *player,
   bool *has_been_waiting);
-
-#endif

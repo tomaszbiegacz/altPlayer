@@ -1,6 +1,4 @@
-#ifndef PLAYER_QFIND_H_
-#define PLAYER_QFIND_H_
-
+#pragma once
 #include "shrdef.h"
 
 /**
@@ -33,5 +31,3 @@ qfind_get_pos_to_insert(ssize_t pos) {
   assert(pos < 0);
   return -(pos + 1);
 }
-
-#endif

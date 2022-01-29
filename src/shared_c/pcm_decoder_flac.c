@@ -1,7 +1,4 @@
-#include <errno.h>
 #include <FLAC/stream_decoder.h>
-#include <stdlib.h>
-#include <string.h>
 #include "pcm_decoder_flac.h"
 
 struct pcm_decoder_flac {

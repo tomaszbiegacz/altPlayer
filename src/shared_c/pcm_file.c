@@ -1,8 +1,4 @@
-#include <assert.h>
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
-#include "filename.h"
+#include "file.h"
 #include "pcm_file.h"
 
 error_t
@@ -10,7 +6,7 @@ pcm_file_format_guess(
   const char *file_name,
   enum pcm_file_format *format) {
     assert(format != NULL);
-    const char *ext = filename_get_ext(file_name);
+    const char *ext = file_name_get_ext(file_name);
 
     if (strcasecmp(ext, "wav") == 0) {
       *format = pcm_file_format_wav;

@@ -1,6 +1,4 @@
 #include <alsa/asoundlib.h>
-#include <assert.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include "log.h"
 #include "alsa_soundc.h"

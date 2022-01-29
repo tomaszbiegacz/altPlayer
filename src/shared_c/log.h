@@ -1,6 +1,4 @@
-#ifndef PLAYER_LOG_H_
-#define PLAYER_LOG_H_
-
+#pragma once
 #include "shrdef.h"
 
 extern bool _log_is_verbose;
@@ -78,5 +76,3 @@ log_system_information();
  */
 void
 log_system_load_information();
-
-#endif

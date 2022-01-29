@@ -1,8 +1,6 @@
-#include <assert.h>
 #include <event.h>
 #include <event2/event.h>
-#include <event2/dns.h>
-#include "events_loop.h"
+#include "event_loop.h"
 #include "log.h"
 
 static bool _is_global_init = false;
@@ -30,7 +28,7 @@ event_log(int severity, const char *msg) {
 }
 
 error_t
-events_loop_global_init() {
+event_loop_global_init() {
   if (!_is_global_init) {
     if (log_is_verbose()) {
       log_verbose("Libevent version: %s", event_get_version());
@@ -42,12 +40,12 @@ events_loop_global_init() {
 }
 
 void
-events_loop_global_release() {
+event_loop_global_release() {
   libevent_global_shutdown();
 }
 
 error_t
-events_loop_create(events_loop **result_r) {
+event_loop_create(events_loop **result_r) {
   assert(result_r != NULL);
 
   struct event_base *evbase = event_base_new();
@@ -61,7 +59,7 @@ events_loop_create(events_loop **result_r) {
 }
 
 void
-events_loop_release(events_loop **result_r) {
+event_loop_release(events_loop **result_r) {
   assert(result_r != NULL);
 
   struct event_base* result = *result_r;
@@ -72,7 +70,7 @@ events_loop_release(events_loop **result_r) {
 }
 
 error_t
-events_loop_run(events_loop *loop) {
+event_loop_run(events_loop *loop) {
   assert(loop != NULL);
 
   error_t error_r = event_base_loop(loop, 0);
@@ -81,32 +79,4 @@ events_loop_run(events_loop *loop) {
     error_r = 0;
   }
   return error_r;
-}
-
-error_t
-event_dns_create(
-  events_loop *loop,
-  event_dns **result_r) {
-    assert(loop != NULL);
-    assert(result_r != NULL);
-
-    struct evdns_base *result = evdns_base_new(loop, 1);
-    if (result == NULL) {
-      log_error("EVENT: cannot create event dns");
-      return EINVAL;
-    }
-
-    *result_r = result;
-    return 0;
-  }
-
-void
-event_dns_release(event_dns **result_r) {
-  assert(result_r != NULL);
-
-  struct evdns_base* result = *result_r;
-  if (result != NULL) {
-    evdns_base_free(result, 1);
-    *result_r = NULL;
-  }
 }

@@ -1,6 +1,4 @@
-#ifndef PLAYER_PCM_FILE_H_
-#define PLAYER_PCM_FILE_H_
-
+#pragma once
 #include "shrdef.h"
 
 enum pcm_file_format {
@@ -12,5 +10,3 @@ error_t
 pcm_file_format_guess(
   const char *file_name,
   enum pcm_file_format *format);
-
-#endif

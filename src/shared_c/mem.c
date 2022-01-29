@@ -1,4 +1,4 @@
-#include <string.h>
+#include <sys/mman.h>
 #include "log.h"
 #include "mem.h"
 
@@ -13,6 +13,63 @@ mem_calloc(const char *resource_name, size_t size, void **result_r) {
   } else {
     *result_r = result;
     return 0;
+  }
+}
+
+void
+mem_free(void **result_r) {
+  assert(result_r != NULL);
+
+  void *result = *result_r;
+  if (result != NULL) {
+    free(result);
+    *result_r = NULL;
+  }
+}
+
+error_t
+mem_map_alloc(const char *resource_name, size_t size, void **result_r) {
+  assert(result_r != NULL);
+
+  void* mem_range = mmap(
+    NULL,
+    size,
+    PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS,
+    0, 0);
+
+  if (mem_range == MAP_FAILED) {
+    log_error(
+      "Failed to allocate memory of size %d for %s",
+      size, resource_name);
+    return errno;
+  } else {
+    log_verbose(
+      "Allocated %dkB of memory mapping starting at %x",
+      size / 1024,
+      (u_int64_t)mem_range);
+    *result_r = mem_range;
+    return 0;
+  }
+}
+
+void
+mem_map_free(size_t size, void **result_r) {
+  assert(result_r != NULL);
+
+  void *result = *result_r;
+  if (result != NULL) {
+    if (munmap(result, size) != 0) {
+      log_error(
+        "Cannot release memory mapping starting at %x due to %s",
+        (u_int64_t)result,
+        strerror(errno));
+    } else {
+      *result_r = NULL;
+      log_verbose(
+        "Released memory mapping starting at %x",
+        (u_int64_t)result);
+    }
   }
 }
 

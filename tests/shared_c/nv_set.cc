@@ -33,8 +33,8 @@ TEST(nv_set, basic) {
   EXPECT_STREQ("v0", nv_set_get_value(kv, "k0"));
   EXPECT_STREQ("v2", nv_set_get_value(kv, "k2"));
 
-  EXPECT_STREQ("k0", nv_set_get_name(kv, 0));
-  EXPECT_STREQ("k2", nv_set_get_name(kv, 1));
+  EXPECT_STREQ("k0", nv_set_get_name_at(kv, 0));
+  EXPECT_STREQ("k2", nv_set_get_name_at(kv, 1));
 
   nv_set_release(&kv);
 }

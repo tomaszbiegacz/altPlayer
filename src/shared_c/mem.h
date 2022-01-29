@@ -1,6 +1,4 @@
-#ifndef PLAYER_MEM_H_
-#define PLAYER_MEM_H_
-
+#pragma once
 #include "shrdef.h"
 
 /**
@@ -10,6 +8,21 @@
  */
 error_t
 mem_calloc(const char *resource_name, size_t size, void **result_r);
+
+void
+mem_free(void **result_r);
+
+
+/**
+ * @brief Allocate private map of memory
+ *
+ * @param resource_name used for loggin failure
+ */
+error_t
+mem_map_alloc(const char *resource_name, size_t size, void **result_r);
+
+void
+mem_map_free(size_t size, void **result_r);
 
 
 //
@@ -166,6 +179,3 @@ mem_list_i64_remove_at(
       memmove(base + pos, base + pos + 1, to_move);
     }
   }
-
-
-#endif
