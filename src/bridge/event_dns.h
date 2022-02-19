@@ -1,7 +1,7 @@
 #ifndef PLAYER_EVENT_DNS_H_
 #define PLAYER_EVENT_DNS_H_
 
-#include "events_loop.h"
+#include "event/event_loop.h"
 
 typedef struct evdns_base event_dns;
 

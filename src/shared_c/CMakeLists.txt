@@ -35,7 +35,7 @@ else()
   message (STATUS "Found uriparser: ${URIPARSER_LIBRARY}")
 endif()
 
-file(GLOB SOURCES "*.c")
+file(GLOB_RECURSE SOURCES "*.c")
 
 add_library(
   shared_c

@@ -1,7 +1,7 @@
 #ifndef PLAYER_HTTP2_STREAM_H_
 #define PLAYER_HTTP2_STREAM_H_
 
-#include "http2_request.h"
+#include "http/http2_request.h"
 
 /**
  * @brief http/2 stream

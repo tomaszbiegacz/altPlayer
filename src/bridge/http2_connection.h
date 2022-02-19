@@ -1,10 +1,10 @@
 #ifndef PLAYER_HTTP2_CONNECTION_H_
 #define PLAYER_HTTP2_CONNECTION_H_
 
-#include "events_loop.h"
+#include "event/event_loop.h"
 #include "http2_ssl.h"
-#include "http2_request.h"
-#include "uri.h"
+#include "http/http2_request.h"
+#include "http/uri.h"
 
 /**
  * @brief Single http connection is always connected to exacly one host

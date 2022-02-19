@@ -1,7 +1,7 @@
 #include "http2_stream.h"
 #include "log.h"
 #include "mem.h"
-#include "nv_set.h"
+#include "structs/nv_set.h"
 
 struct http2_stream {
   int id;

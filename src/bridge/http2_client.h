@@ -1,7 +1,7 @@
 #ifndef PLAYER_HTTP2_CLIENT_H_
 #define PLAYER_HTTP2_CLIENT_H_
 
-#include "http2_request.h"
+#include "http/http2_request.h"
 
 /**
  * @brief Http client that can potentially handle multiple http/2 streams

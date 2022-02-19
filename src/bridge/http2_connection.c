@@ -7,10 +7,10 @@
 #include "event_dns.h"
 #include "http2_connection.h"
 #include "http2_stream.h"
-#include "kp_set.h"
+#include "structs/kp_set.h"
 #include "log.h"
 #include "mem.h"
-#include "nv_set.h"
+#include "structs/nv_set.h"
 
 struct http2_connection {
   struct uri_authority *authority;

@@ -1,7 +1,7 @@
 #ifndef PLAYER_MAIN_H_
 #define PLAYER_MAIN_H_
 
-#include "pcm_file.h"
+#include "pcm/pcm_file.h"
 #include "alsa_player.h"
 
 struct bridge_config {

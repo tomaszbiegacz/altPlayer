@@ -2,7 +2,7 @@
 #include "../SharedTestFixture.h"
 
 extern "C" {
-  #include "event_pipe.h"
+  #include "event/event_pipe.h"
 }
 
 class TestMemoryPipeCopy {

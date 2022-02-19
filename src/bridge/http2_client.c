@@ -8,7 +8,7 @@
 #include "http2_connection.h"
 #include "http2_ssl.h"
 #include "log.h"
-#include "uri.h"
+#include "http/uri.h"
 
 struct http2_client {
   events_loop *events_loop;
@@ -41,7 +41,7 @@ http2_client_global_init() {
   if (!_is_global_init) {
     error_r = disable_signals();
     if (error_r == 0) {
-      error_r = events_loop_global_init();
+      error_r = event_loop_global_init();
     }
     if (error_r == 0) {
       const nghttp2_info *version = nghttp2_version(0);
@@ -66,7 +66,7 @@ http2_client_create(struct http2_client **result_r) {
     return ENOMEM;
   }
 
-  error_t error_r =  events_loop_create(&result->events_loop);
+  error_t error_r =  event_loop_create(&result->events_loop);
   if (error_r == 0) {
     error_r = http2_ssl_ctx_create(&result->ssl_context);
   }
@@ -85,7 +85,7 @@ http2_client_release(struct http2_client **result_r) {
   struct http2_client *result = *result_r;
   if (result != NULL) {
     http2_ssl_ctx_release(&result->ssl_context);
-    events_loop_release(&result->events_loop);
+    event_loop_release(&result->events_loop);
     http2_connection_release(&result->conn);
     free(result);
     *result_r = NULL;
@@ -119,6 +119,6 @@ http2_client_request(
     }
 
     // process all events, this is not what we want at the end
-    error_r = events_loop_run(client->events_loop);
+    error_r = event_loop_run(client->events_loop);
     return error_r;
   }

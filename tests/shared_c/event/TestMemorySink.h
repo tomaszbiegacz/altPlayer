@@ -2,8 +2,8 @@
 #include "../SharedTestFixture.h"
 
 extern "C" {
-  #include "event_sink.h"
-  #include "event_trigger.h"
+  #include "event/event_sink.h"
+  #include "event/event_trigger.h"
 }
 
 class TestMemorySink {
