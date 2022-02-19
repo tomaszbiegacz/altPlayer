@@ -20,20 +20,19 @@ struct event_pipe;
  * @param arg Custom state for pipe processing
  * @param input Input buffer, for source pipe this is NULL
  * @param is_input_end Return information whether input stream has completed.
- *  This will be not NULL only if input is NULL.
+ *  For intermediate pipe set to true to signal end of it's processing
+ *  and allow read on for the next pipe.
+ *  For buffered pipes this is NULL.
  * @param output Output buffer. For intermediate pipe this is NULL
  * @param is_buffer_full For output buffered pipe return information whether
- *  all available space has been used. For intermediate pipe
- *  set to true to signal end of it's processing and allow read on for
- *  the next pipe.
+ *  all available space has been used.
  */
 typedef error_t event_pipe_on_read (
   struct event_pipe *pipe,
   void *arg,
   struct cont_buf_read *input,
   bool *is_input_end,
-  struct cont_buf *output,
-  bool *is_buffer_full);
+  struct cont_buf *output);
 
 typedef error_t event_pipe_on_event (
   struct event_pipe *pipe,
@@ -155,6 +154,14 @@ size_t
 event_pipe_get_read_lowmark(const struct event_pipe *pipe);
 
 /**
+ * @brief For not intermediate pipes "on_read" is being called
+ * only if there is at minimum "lowmark" available space in the input buffer.
+ * For intermediate pipes "lowmark" is ignored.
+ */
+size_t
+event_pipe_get_write_lowmark(const struct event_pipe *pipe);
+
+/**
  * @brief No input can be read into the output buffer.
  * For intermediate pipe this is inherited from the previous pipe.
  */
@@ -162,24 +169,46 @@ bool
 event_pipe_is_end(const struct event_pipe *pipe);
 
 /**
- * @brief Return positive if pipe is marked as "end"
- * or there is no more space in the buffer left for writing.
+ * @brief For buffered pipe return positive if pipe is marked as "end"
+ * or there is not enough space in the buffer left for writing (see "lowmark").
  * For intermediate pipe this will be positive once
- * it's processing will complete, for other cases this is inherited
- * from pipe owning it's input buffer.
+ * it's processing will complete.
  */
 bool
 event_pipe_is_buffer_full(const struct event_pipe *pipe);
+
+/**
+ * @brief For intermediate pipe returns true.
+ * For buffered or source pipe return true if no data is available in input.
+ */
+bool
+event_pipe_is_empty(const struct event_pipe *pipe);
+
+/**
+ * @brief How many times read callback has been called?
+ */
+size_t
+event_pipe_get_read_count(const struct event_pipe *pipe);
 
 //
 // Command
 //
 
 /**
- * @brief Sets "lowmark", see "event_pipe_get_read_lowmark"
+ * @brief Sets read lowmark, see "event_pipe_get_read_lowmark"
  */
 void
 event_pipe_set_read_lowmark(
+  struct event_pipe *pipe,
+  size_t lowmark);
+
+/**
+ * @brief Sets write lowmark, see "event_pipe_get_write_lowmark".
+ * For intermediate pipe, this is efectively setting "lowmark" at
+ * the buffered pipe level.
+ */
+void
+event_pipe_set_write_lowmark(
   struct event_pipe *pipe,
   size_t lowmark);
 
@@ -195,7 +224,7 @@ event_pipe_buffer_size(
 /**
  * @brief Trigger "on_read" if there is a space in the output buffer.
  * Continue reading down the pipe.
- * If stream has complted, EIO will be returned.
+ * If input stream is closed, EIO will be returned.
  */
 error_t
 event_pipe_read_down(struct event_pipe *pipe);
@@ -204,7 +233,7 @@ event_pipe_read_down(struct event_pipe *pipe);
  * @brief Trigger "on_read" on current pipe if it is ready for read.
  * Continue reading up the pipe.
  * This will not have effect on source pipe.
- * If stream has complted, EIO will be returned.
+ * If input stream is closed, EIO will be returned.
  */
 error_t
 event_pipe_read_up(struct event_pipe *pipe);

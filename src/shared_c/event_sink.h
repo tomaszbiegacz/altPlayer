@@ -55,15 +55,15 @@ event_sink_create(
   struct event_sink_config *config,
   struct event_sink **result_r);
 
-void
-event_sink_release(struct event_sink **result_r);
-
 //
 // Query
 //
 
 const char*
-event_sink_get_name(const struct event_sink *pipe);
+event_sink_get_name(const struct event_sink *sink);
+
+bool
+event_sink_is_end(const struct event_sink *sink);
 
 //
 // Command
@@ -72,7 +72,7 @@ event_sink_get_name(const struct event_sink *pipe);
 /**
  * @brief Trigger pipe write operation if there is anything to read in
  * the source pipe.
- * If output stream has complted, EIO will be returned.
+ * If output stream is already closed, EIO will be returned.
  */
 error_t
-event_sink_write(struct event_sink *pipe);
+event_sink_write(struct event_sink *sink);

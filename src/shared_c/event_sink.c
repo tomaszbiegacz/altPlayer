@@ -27,18 +27,6 @@ sink_free(void *arg) {
   free(sink);
 }
 
-void
-event_sink_release(struct event_sink **result_r) {
-  assert(result_r != NULL);
-
-  struct event_sink *result = *result_r;
-  if (result != NULL) {
-    // this implicitly call "sink_free"
-    event_pipe_release(&result->pipe);
-    *result_r = NULL;
-  }
-}
-
 static error_t
 sink_register_event(struct event_sink *sink) {
   error_t error_r = 0;
@@ -54,12 +42,10 @@ pipe_on_read(
   void *arg,
   struct cont_buf_read *input,
   bool *is_input_end,
-  struct cont_buf *output,
-  bool *is_buffer_full) {
+  struct cont_buf *output) {
     assert(arg != NULL);
     assert(output == NULL);
     UNUSED(is_input_end);
-    UNUSED(is_buffer_full);
 
     struct event_sink *sink = (struct event_sink*)arg;
     assert(sink->pipe == pipe);
@@ -71,6 +57,39 @@ pipe_on_read(
     }
     return sink_register_event(sink);
   }
+
+static bool
+event_sink_is_source_drained(const struct event_sink *sink) {
+  bool is_source_end = event_pipe_is_end(sink->source);
+  bool is_source_empty = cont_buf_read_is_empty(sink->input);
+  return is_source_end && is_source_empty;
+}
+
+static error_t
+event_sink_end(struct event_sink *sink) {
+  error_t error_r = 0;
+  if (!sink->is_end && sink->on_end != NULL)  {
+    error_r = sink->on_end(sink, sink->arg);
+  }
+  if (error_r == 0) {
+    sink->is_end = true;
+  }
+  return error_r;
+}
+
+static error_t
+pipe_on_end(struct event_pipe *pipe, void *arg) {
+  assert(arg != NULL);
+
+  struct event_sink *sink = (struct event_sink*)arg;
+  assert(sink->pipe == pipe);
+
+  error_t error_r = 0;
+  if (event_sink_is_source_drained(sink)) {
+    error_r = event_sink_end(sink);
+  }
+  return error_r;
+}
 
 static void
 pipe_on_error(struct event_pipe *pipe, void *arg) {
@@ -125,6 +144,7 @@ event_sink_create(
       pipe_config.arg = result;
       pipe_config.arg_free = sink_free;
       pipe_config.on_read = pipe_on_read;
+      pipe_config.on_end = pipe_on_end;
       pipe_config.on_error = pipe_on_error;
       error_r = event_pipe_create(source, &pipe_config, &result->pipe);
     }
@@ -143,23 +163,10 @@ event_sink_get_name(const struct event_sink *sink) {
   return event_pipe_get_name(sink->pipe);
 }
 
-static bool
-event_sink_is_source_drained(const struct event_sink *sink) {
-  bool is_source_end = event_pipe_is_end(sink->source);
-  bool is_source_empty = cont_buf_read_is_empty(sink->input);
-  return is_source_end && is_source_empty;
-}
-
-static error_t
-event_sink_end(struct event_sink *sink) {
-  error_t error_r = 0;
-  if (!sink->is_end && sink->on_end != NULL)  {
-    error_r = sink->on_end(sink, sink->arg);
-  }
-  if (error_r == 0) {
-    sink->is_end = true;
-  }
-  return error_r;
+bool
+event_sink_is_end(const struct event_sink *sink) {
+  assert(sink != NULL);
+  return sink->is_end;
 }
 
 static error_t

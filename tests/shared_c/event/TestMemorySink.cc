@@ -31,6 +31,12 @@ on_write(
     return 0;
   }
 
+static void
+free_sink(void *arg) {
+  TestMemorySink *sink = (TestMemorySink*)arg;
+  sink->Dispose();
+}
+
 TestMemorySink::TestMemorySink(struct event_pipe *source, size_t size) {
   struct event_base *loop = event_pipe_get_loop(source);
 
@@ -38,6 +44,7 @@ TestMemorySink::TestMemorySink(struct event_pipe *source, size_t size) {
 
   EMPTY_STRUCT(event_sink_config, sink_conf);
   sink_conf.arg = this;
+  sink_conf.arg_free = free_sink;
   assert(0 == mem_strdup("memory sink", &sink_conf.name));
   sink_conf.on_write = on_write;
   sink_conf.on_register_event = on_register_trigger;

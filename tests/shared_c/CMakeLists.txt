@@ -16,7 +16,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-file(GLOB TEST_SOURCES "*.cc")
+file(GLOB_RECURSE TEST_SOURCES "*.cc")
 
 add_executable(
   tests_shared_c

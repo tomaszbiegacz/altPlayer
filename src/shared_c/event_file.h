@@ -22,6 +22,9 @@ event_pipe_from_file(
   const struct event_pipe_file_config *config,
   struct event_pipe **result_r);
 
+/**
+ * @brief Create sink into file
+ */
 error_t
 event_sink_into_file(
   struct event_pipe *source,

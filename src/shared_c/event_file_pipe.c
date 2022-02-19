@@ -44,13 +44,11 @@ pipe_on_read(
   void *arg,
   struct cont_buf_read *input,
   bool *is_input_end,
-  struct cont_buf *output,
-  bool *is_buffer_full) {
+  struct cont_buf *output) {
     assert(arg != NULL);
     assert(input == NULL);
     assert(is_input_end != NULL);
     assert(output != NULL);
-    assert(is_buffer_full != NULL);
 
     struct event_pipe_file *result = (struct event_pipe_file*)arg; // NOLINT
     assert(pipe == result->pipe);
@@ -170,3 +168,4 @@ event_pipe_from_file(
     }
     return error_r;
   }
+
