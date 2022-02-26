@@ -1,5 +1,5 @@
 #pragma once
-#include "../structs/cont_buf.h"
+#include "../struct/cont_buf.h"
 #include "event_loop.h"
 
 /**

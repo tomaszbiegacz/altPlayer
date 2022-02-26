@@ -1,6 +1,6 @@
 #include "../mem.h"
 #include "../log.h"
-#include "../structs/cont_buf.h"
+#include "../struct/cont_buf.h"
 #include "event_pipe.h"
 
 /**

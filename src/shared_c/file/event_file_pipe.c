@@ -2,8 +2,8 @@
 #include <event2/event.h>
 #include "../log.h"
 #include "../mem.h"
-#include "../structs/cont_buf.h"
 #include "../event/event_trigger.h"
+#include "../struct/cont_buf.h"
 #include "event_file.h"
 #include "file.h"
 

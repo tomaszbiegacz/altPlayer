@@ -1,7 +1,7 @@
 #include "../SharedTestFixture.h"
 
 extern "C" {
-  #include "structs/nv_set.h"
+  #include "struct/nv_set.h"
   #include "log.h"
 }
 

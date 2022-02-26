@@ -1,6 +1,6 @@
 #include "../log.h"
 #include "../mem.h"
-#include "../structs/nv_set.h"
+#include "../struct/nv_set.h"
 #include "http2_request.h"
 
 struct http2_request {

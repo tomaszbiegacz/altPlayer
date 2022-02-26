@@ -1,7 +1,7 @@
 #include "../SharedTestFixture.h"
 
 extern "C" {
-  #include "structs/qfind.h"
+  #include "struct/qfind.h"
 }
 
 static int

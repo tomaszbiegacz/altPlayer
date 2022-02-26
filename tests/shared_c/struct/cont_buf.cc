@@ -1,7 +1,7 @@
 #include "../SharedTestFixture.h"
 
 extern "C" {
-  #include "structs/cont_buf.h"
+  #include "struct/cont_buf.h"
 }
 
 TEST(structs__cont_buf, array) {

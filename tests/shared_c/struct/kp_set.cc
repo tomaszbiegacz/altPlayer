@@ -1,7 +1,7 @@
 #include "../SharedTestFixture.h"
 
 extern "C" {
-  #include "structs/kp_set.h"
+  #include "struct/kp_set.h"
 }
 
 void

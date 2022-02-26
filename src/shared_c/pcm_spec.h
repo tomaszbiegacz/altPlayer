@@ -69,10 +69,18 @@ pcm_spec_get_frame_size(const struct pcm_spec *params) {
   return params->channels_count * params->bytes_per_sample;
 }
 
-struct timespec
+inline static struct timespec
 pcm_spec_get_time_for_frames(
   const struct pcm_spec *params,
-  size_t frames_count);
+  size_t frames_count) {
+    assert(params != NULL);
+    struct timespec result;
+    result.tv_sec = frames_count / params->samples_per_sec;
+    result.tv_nsec = 1000l * 1000l * 1000l  // nano in second
+      * (frames_count - result.tv_sec * params->samples_per_sec)
+      / params->samples_per_sec;
+    return result;
+  }
 
 inline static struct timespec
 pcm_spec_get_time(const struct pcm_spec *params) {
@@ -80,9 +88,13 @@ pcm_spec_get_time(const struct pcm_spec *params) {
   return pcm_spec_get_time_for_frames(params, params->frames_count);
 }
 
-size_t
+inline static size_t
 pcm_spec_get_frames_count_for_time(
-  const struct pcm_spec *params, size_t time_ms);
+  const struct pcm_spec *params,
+  size_t time_ms) {
+    assert(params != NULL);
+    return params->samples_per_sec * time_ms / 1000;
+  }
 
 inline static void
 pcm_spec_log(const char *block_name, const struct pcm_spec *params) {

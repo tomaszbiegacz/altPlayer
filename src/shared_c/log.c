@@ -157,18 +157,18 @@ log_system_load_information() {
     const unsigned mb = 1024*1024;
 
     const int page_size = getpagesize();
-    const long phys_pages = get_phys_pages();
-    const long avphys_pages = get_avphys_pages();
+    const uint64_t phys_pages = get_phys_pages();
+    const uint64_t avphys_pages = get_avphys_pages();
 
-    log_verbose("Page size: %d", page_size);
+    log_verbose("Page size: %ld", page_size);
 
     log_verbose(
-      "Physical memory pages: %d (%d MB)",
+      "Physical memory pages: %ld (%d MB)",
       phys_pages,
       phys_pages * page_size / mb);
 
     log_verbose(
-      "Available physical memory pages: %d (%d MB)",
+      "Available physical memory pages: %ld (%ld MB)",
       avphys_pages,
       avphys_pages * page_size / mb);
 
