@@ -28,6 +28,29 @@ public:
     return c1;
   }
 
+  static bool CompareFiles(const char* p1, const char* p2) {
+    fs::permissions(p1, fs::perms::owner_read, fs::perm_options::add);
+    fs::permissions(p2, fs::perms::owner_read, fs::perm_options::add);
+
+    std::ifstream f1(p1, std::ifstream::binary|std::ifstream::ate);
+    std::ifstream f2(p2, std::ifstream::binary|std::ifstream::ate);
+
+    if (f1.fail() || f2.fail()) {
+      return false; //file problem
+    }
+
+    if (f1.tellg() != f2.tellg()) {
+      return false; //size mismatch
+    }
+
+    f1.seekg(0, std::ifstream::beg);
+    f2.seekg(0, std::ifstream::beg);
+    return std::equal(
+      std::istreambuf_iterator<char>(f1.rdbuf()),
+      std::istreambuf_iterator<char>(),
+      std::istreambuf_iterator<char>(f2.rdbuf()));
+  }
+
   TestFile(const char* prefix, const char* content) {
     _path = GetTempFilePath(prefix);
 

@@ -1,3 +1,4 @@
+#include "../TestFile.h"
 #include "../event/TestMemorySink.h"
 
 extern "C" {
@@ -32,7 +33,6 @@ TEST(pcm__event_wav, read_wav) {
   EXPECT_EQ(true, event_pipe_is_empty(source));
   EXPECT_EQ(true, event_pipe_is_end(source));
 
-
   EXPECT_EQ(true, event_pipe_is_empty(wav_pipe));
   EXPECT_EQ(true, event_pipe_is_end(wav_pipe));
 
@@ -49,6 +49,55 @@ TEST(pcm__event_wav, read_wav) {
 
   // release it all
   pcm_spec_release(&spec);
+  event_pipe_release(&source);
+  event_loop_release(&loop);
+}
+
+TEST(pcm__event_wav, copy_wav) {
+  log_set_verbose(true);
+  EXPECT_EQ(0, event_loop_global_init());
+
+  struct event_base *loop = NULL;
+  EXPECT_EQ(0, event_loop_create(&loop));
+
+  // source
+  struct event_pipe *source = NULL;
+  EMPTY_STRUCT(event_pipe_file_config, source_conf);
+  source_conf.file_path = "test.wav";
+  source_conf.buffer_size = 1;  // force resize
+  EXPECT_EQ(0, event_pipe_from_file(loop, &source_conf, &source));
+
+  // wave decoder
+  struct event_pcm *wav_in = NULL;
+  EXPECT_EQ(0, event_wav_decode(source, &wav_in));
+
+  // wave encoder
+  struct event_pipe *wav_out = NULL;
+  EXPECT_EQ(0, event_wav_encode(wav_in, &wav_out));
+
+  // output
+  struct event_sink *output = NULL;
+  char *output_path = TestFile::GetTempFilePath("output");
+  EXPECT_EQ(0, event_sink_into_file(wav_out, output_path, &output));
+
+  // run & check
+  EXPECT_EQ(0, event_loop_run(loop));
+
+  EXPECT_EQ(true, event_pipe_is_empty(source));
+  EXPECT_EQ(true, event_pipe_is_end(source));
+
+  struct event_pipe *wav_in_pipe = event_pcm_get_pipe(wav_in);
+  EXPECT_EQ(true, event_pipe_is_empty(wav_in_pipe));
+  EXPECT_EQ(true, event_pipe_is_end(wav_in_pipe));
+
+  EXPECT_EQ(true, event_pipe_is_empty(wav_out));
+  EXPECT_EQ(true, event_pipe_is_end(wav_out));
+
+  EXPECT_EQ(true, event_sink_is_end(output));
+  EXPECT_EQ(true, TestFile::CompareFiles(source_conf.file_path, output_path));
+
+  // release it all
+  free(output_path);
   event_pipe_release(&source);
   event_loop_release(&loop);
 }
