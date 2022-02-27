@@ -197,7 +197,7 @@ event_pipe_get_read_count(const struct event_pipe *pipe);
 /**
  * @brief Sets read lowmark, see "event_pipe_get_read_lowmark"
  */
-void
+error_t
 event_pipe_set_read_lowmark(
   struct event_pipe *pipe,
   size_t lowmark);
@@ -207,19 +207,20 @@ event_pipe_set_read_lowmark(
  * For intermediate pipe, this is efectively setting "lowmark" at
  * the buffered pipe level.
  */
-void
+error_t
 event_pipe_set_write_lowmark(
   struct event_pipe *pipe,
   size_t lowmark);
 
 /**
- * @brief Make sure that output buffer is exactly at given size.
- * This will fail badly for intermediate pipes.
+ * @brief Make sure that the output buffer is exactly at given size.
+ * This will fail for intermediate pipes
+ * or when requested buffer size is below currently stored data size.
  */
 error_t
 event_pipe_buffer_size(
   struct event_pipe *pipe,
-  size_t min_buffer_size);
+  size_t buffer_size);
 
 /**
  * @brief Trigger "on_read" if there is a space in the output buffer.

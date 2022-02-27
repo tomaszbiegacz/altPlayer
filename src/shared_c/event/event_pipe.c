@@ -250,24 +250,47 @@ event_pipe_get_write_lowmark(const struct event_pipe *pipe) {
   return pipe->write_lowmark;
 }
 
-void
+error_t
 event_pipe_set_read_lowmark(
   struct event_pipe *pipe,
   size_t lowmark) {
     assert(pipe != NULL);
     assert(lowmark > 0);
-    pipe->read_lowmark = lowmark;
+    error_t error_r = 0;
+    struct event_pipe *input = get_input_pipe(pipe);
+    if (lowmark > cont_buf_get_available_size(input->buffer)) {
+      error_r = event_pipe_buffer_size(input, lowmark);
+    }
+    if (error_r == 0) {
+      pipe->read_lowmark = lowmark;
+    }
+    return error_r;
   }
 
-void
+error_t
 event_pipe_set_write_lowmark(
   struct event_pipe *pipe,
   size_t lowmark) {
     assert(pipe != NULL);
     assert(lowmark > 0);
+    error_t error_r = 0;
     struct event_pipe *input = get_input_pipe(pipe);
-    assert(lowmark <= cont_buf_get_available_size(input->buffer));
-    pipe->write_lowmark = lowmark;
+    if (lowmark > cont_buf_get_available_size(input->buffer)) {
+      error_r = event_pipe_buffer_size(input, lowmark);
+    }
+    if (error_r == 0) {
+      pipe->write_lowmark = lowmark;
+    }
+    return error_r;
+  }
+
+error_t
+event_pipe_buffer_size(
+  struct event_pipe *pipe,
+  size_t buffer_size) {
+    assert(pipe != NULL);
+    assert(pipe->buffer != NULL);
+    return cont_buf_resize(pipe->buffer, buffer_size);
   }
 
 bool

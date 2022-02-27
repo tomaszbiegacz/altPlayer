@@ -122,11 +122,12 @@ pcm_spec_set_channels_count(
   }
 
 void
-pcm_spec_set_bytes_per_sample(
+pcm_spec_set_bits_per_sample(
   struct pcm_spec_builder *params,
   uint16_t value) {
     assert(params != NULL);
-    params->spec.bytes_per_sample = value;
+    assert(value % 8 == 0);
+    params->spec.bytes_per_sample = value / 8;
   }
 
 void
@@ -143,4 +144,23 @@ pcm_spec_set_frames_count(
   size_t value) {
     assert(params != NULL);
     params->spec.frames_count = value;
+  }
+
+error_t
+pcm_spec_set_data_size(
+  struct pcm_spec_builder *params,
+  size_t data_size) {
+    assert(params != NULL);
+    error_t error_r = 0;
+    size_t frame_size = pcm_spec_get_frame_size(&params->spec);
+    if (data_size % frame_size != 0) {
+      log_error(
+        "PCM: data size %ld is not compatible with frame size",
+        data_size,
+        frame_size);
+      error_r = EINVAL;
+    } else {
+      pcm_spec_set_frames_count(params, data_size / frame_size);
+    }
+    return error_r;
   }

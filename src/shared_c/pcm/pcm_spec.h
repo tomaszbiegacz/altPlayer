@@ -115,7 +115,7 @@ pcm_spec_set_channels_count(
   uint16_t value);
 
 void
-pcm_spec_set_bytes_per_sample(
+pcm_spec_set_bits_per_sample(
   struct pcm_spec_builder *params,
   uint16_t value);
 
@@ -128,3 +128,8 @@ void
 pcm_spec_set_frames_count(
   struct pcm_spec_builder *params,
   size_t value);
+
+error_t
+pcm_spec_set_data_size(
+  struct pcm_spec_builder *params,
+  size_t data_size);

@@ -60,6 +60,8 @@ cont_buf_clear(struct cont_buf *buf);
 
 /**
  * @brief Change buffer's size
+ * This will fail
+ * when requested buffer size is below currently stored data size.
  */
 error_t
 cont_buf_resize(struct cont_buf *buf, size_t size);
