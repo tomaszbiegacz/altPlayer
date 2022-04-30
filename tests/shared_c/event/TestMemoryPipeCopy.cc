@@ -14,11 +14,12 @@ on_read(
     assert(pipe != NULL);
     assert(arg != NULL);
     assert(input != NULL);
-    assert(is_input_end == NULL);
+    assert(is_input_end != NULL);
     assert(output != NULL);
 
     TestMemoryPipeCopy *sink = (TestMemoryPipeCopy*)arg;
     sink->MoveToBuffer(input);
+    *is_input_end = cont_buf_read_is_empty(input);
     return 0;
   }
 

@@ -45,7 +45,7 @@ pipe_on_read(
   struct cont_buf *output) {
     assert(arg != NULL);
     assert(output == NULL);
-    UNUSED(is_input_end);
+    assert(is_input_end != NULL);
 
     struct event_sink *sink = (struct event_sink*)arg;
     assert(sink->pipe == pipe);

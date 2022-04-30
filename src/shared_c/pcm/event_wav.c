@@ -280,6 +280,9 @@ event_wav_decode(
         *result_r = event;
       } else {
         mem_free((void**)&pipe_config.name);  // NOLINT
+        if (arg != NULL) {
+          event_wav_decoder_free(arg);
+        }
       }
     }
     return error_r;
@@ -322,9 +325,7 @@ write_header(struct pcm_spec *spec, struct cont_buf *output) {
     pcm_spec_get_frames_count(spec) * pcm_spec_get_frame_size(spec);
 
   header.overall_size = data_chunk.data_size
-    + sizeof(struct wav_header)
-    + sizeof(struct wav_fmt_chunk_header)
-    + sizeof(struct wav_data_chunk_header)
+    + get_min_wav_header_size()
     - 8;  // see http://tiny.systems/software/soundProgrammer/WavFormatDocs.pdf
 
   cont_buf_write_assert(output, (const void*)&header, sizeof(header));
@@ -342,7 +343,7 @@ pipe_on_read_encode(
     UNUSED(pipe);
     assert(arg != NULL);
     assert(input != NULL);
-    UNUSED(is_input_end);
+    assert(is_input_end != NULL);
     assert(output != NULL);
 
     error_t error_r = 0;
@@ -357,7 +358,12 @@ pipe_on_read_encode(
     }
     if (error_r == 0 && wav->is_header_written) {
       // this could be improved by changing pipe into intermediate
-      cont_buf_move(output, input);
+      if (cont_buf_read_is_empty(input)) {
+        *is_input_end = true;
+      } else {
+        size_t move_count = cont_buf_move(output, input);
+        assert(move_count > 0);
+      }
     }
     return error_r;
   }
@@ -375,7 +381,7 @@ event_wav_encode(
       sizeof(struct event_wav_encoder),
       (void**)&arg);  // NOLINT
     if (error_r == 0) {
-      error_r = cont_buf_create(get_min_wav_header_size(), &buf);
+      error_r = cont_buf_create(1000, &buf);
     }
     if (error_r == 0) {
       arg->pcm = source;

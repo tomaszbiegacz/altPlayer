@@ -249,8 +249,10 @@ cont_buf_move(
     if (available > 0) {
       const void *data = NULL;
       size_t count = cont_buf_read_array_begin(src, 1, &data, available);
-      written = cont_buf_write(dest, data, count);
-      cont_buf_read_array_commit(src, 1, written);
+      if (count > 0) {
+        written = cont_buf_write(dest, data, count);
+        cont_buf_read_array_commit(src, 1, written);
+      }
     }
     return written;
   }

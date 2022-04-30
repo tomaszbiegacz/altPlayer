@@ -135,7 +135,7 @@ TEST(file__event_file, read_intermediate_single) {
 
   EXPECT_EQ(true, event_pipe_is_empty(copy.GetPipe()));
   EXPECT_EQ(true, event_pipe_is_end(copy.GetPipe()));
-  EXPECT_EQ(1, event_pipe_get_read_count(copy.GetPipe()));
+  EXPECT_EQ(2, event_pipe_get_read_count(copy.GetPipe()));
 
   EXPECT_TRUE(sink.IsDataEqual(data));
   EXPECT_EQ(true, event_sink_is_end(sink.GetSink()));
@@ -216,7 +216,7 @@ TEST(file__event_file, read_intermediate_many_padding) {
 
   EXPECT_EQ(true, event_pipe_is_empty(copy.GetPipe()));
   EXPECT_EQ(true, event_pipe_is_end(copy.GetPipe()));
-  EXPECT_EQ(3, event_pipe_get_read_count(copy.GetPipe()));
+  EXPECT_EQ(4, event_pipe_get_read_count(copy.GetPipe()));
 
   EXPECT_TRUE(sink.IsDataEqual(data));
   EXPECT_EQ(true, event_sink_is_end(sink.GetSink()));

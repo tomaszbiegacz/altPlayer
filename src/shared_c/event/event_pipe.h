@@ -22,7 +22,7 @@ struct event_pipe;
  * @param is_input_end Return information whether input stream has completed.
  *  For intermediate pipe set to true to signal end of it's processing
  *  and allow read on for the next pipe.
- *  For buffered pipes this is NULL.
+ *  For buffered pipes set to true when all input has been processed.
  * @param output Output buffer. For intermediate pipe this is NULL
  * @param is_buffer_full For output buffered pipe return information whether
  *  all available space has been used.

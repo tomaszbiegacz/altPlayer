@@ -258,8 +258,8 @@ event_pipe_set_read_lowmark(
     assert(lowmark > 0);
     error_t error_r = 0;
     struct event_pipe *input = get_input_pipe(pipe);
-    if (lowmark > cont_buf_get_available_size(input->buffer)) {
-      error_r = event_pipe_buffer_size(input, lowmark);
+    if (lowmark >= cont_buf_get_available_size(input->buffer)) {
+      error_r = event_pipe_buffer_size(input, 2 * lowmark);
     }
     if (error_r == 0) {
       pipe->read_lowmark = lowmark;
@@ -272,11 +272,11 @@ event_pipe_set_write_lowmark(
   struct event_pipe *pipe,
   size_t lowmark) {
     assert(pipe != NULL);
+    assert(pipe->buffer != NULL);
     assert(lowmark > 0);
     error_t error_r = 0;
-    struct event_pipe *input = get_input_pipe(pipe);
-    if (lowmark > cont_buf_get_available_size(input->buffer)) {
-      error_r = event_pipe_buffer_size(input, lowmark);
+    if (lowmark >= cont_buf_get_available_size(pipe->buffer)) {
+      error_r = event_pipe_buffer_size(pipe, 2 * lowmark);
     }
     if (error_r == 0) {
       pipe->write_lowmark = lowmark;
@@ -306,7 +306,7 @@ event_pipe_is_end_effective(struct event_pipe *pipe) {
   }
 
   bool is_prev_end = event_pipe_is_end(pipe->prev);
-  if (is_intermediate(pipe)) {
+  if (is_intermediate(pipe) && !is_sink(pipe)) {
     return is_prev_end && is_intermediate_processed(pipe);
   } else {
     struct cont_buf_read *input = get_input(pipe);
@@ -320,7 +320,7 @@ event_pipe_is_buffer_full(const struct event_pipe *pipe) {
     return is_intermediate_processed(pipe);
   } else {
     size_t available_size = cont_buf_get_available_size(pipe->buffer);
-    return pipe->is_end || available_size < pipe->write_lowmark;
+    return pipe->is_end || available_size <= pipe->write_lowmark;
   }
 }
 
@@ -385,7 +385,8 @@ event_pipe_is_read_ready(struct event_pipe *pipe) {
     struct cont_buf_read *read = get_input(pipe);
     size_t unread = cont_buf_get_unread_size(read);
     if (event_pipe_is_end(pipe->prev)) {
-      return unread > 0;
+      // finish it
+      return true;
     } else {
       return unread >= pipe->read_lowmark;
     }
@@ -407,12 +408,17 @@ trigger_on_read(
   struct event_pipe *pipe,
   bool *is_input_end) {
     assert(!is_intermediate_processed(pipe));
+    bool is_buffered = false;
+    bool is_buffered_end = false;
 
     bool *is_end = NULL;
     if (is_source(pipe)) {
       is_end = is_input_end;
     } else if (is_intermediate(pipe)) {
       is_end = &pipe->is_next_enabled;
+    } else {
+      is_buffered = true;
+      is_end = &is_buffered_end;
     }
 
     error_t error_r = pipe->on_read(
@@ -424,9 +430,10 @@ trigger_on_read(
     if (error_r == 0) {
       pipe->read_count++;
 
-      if (is_end == NULL) {
+      if (is_buffered) {
         // maybe pipe has processed all input
-        *is_input_end = event_pipe_is_end_effective(pipe);
+        bool is_prev_end = event_pipe_is_end(pipe->prev);
+        *is_input_end = is_prev_end && is_buffered_end;
       }
     }
 
@@ -463,7 +470,11 @@ callbacks_after_read(struct event_pipe *pipe, bool is_input_end) {
   }
 
   if (error_r == 0 && is_source(pipe) && !pipe->is_end) {
-    error_r = issue_register_event(pipe);
+    if (is_source(pipe)) {
+      error_r = issue_register_event(pipe);
+    } else {
+      apply_no_padding_strategy(pipe);
+    }
   }
   return error_r;
 }
@@ -494,7 +505,7 @@ event_pipe_read_down(struct event_pipe *pipe) {
   bool is_ouput_ready = !event_pipe_is_buffer_full(pipe);
   if (is_input_ready && is_ouput_ready) {
     bool is_end = event_pipe_is_end_effective(pipe);
-    if (!is_end) {
+    if (!(is_end && is_intermediate(pipe))) {
       error_r = trigger_on_read(pipe, &is_end);
     }
     if (error_r == 0) {
@@ -541,7 +552,8 @@ event_pipe_read_up(struct event_pipe *pipe) {
   } else if (is_sink(pipe)) {
     // reading at sink level will not really help, move up
     error_r = read_up_the_pipe(pipe);
-  } else {
+  } else if(!event_pipe_is_end(pipe)) {
+    apply_no_padding_strategy(pipe);
     while (
       error_r == 0
       && !event_pipe_is_end(pipe)
@@ -550,7 +562,9 @@ event_pipe_read_up(struct event_pipe *pipe) {
         if (event_pipe_is_read_ready(pipe)) {
           // fill-up the pipe
           bool is_end = event_pipe_is_end_effective(pipe);
-          error_r = trigger_on_read(pipe, &is_end);
+          if (!(is_end && is_intermediate(pipe))) {
+            error_r = trigger_on_read(pipe, &is_end);
+          }
           if (error_r == 0) {
             error_r = callbacks_after_read(pipe, is_end);
           }
